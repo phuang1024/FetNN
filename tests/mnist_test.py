@@ -1,6 +1,7 @@
 """Test cINN on MNIST.
 """
 
+import argparse
 from tqdm import tqdm
 
 import torch
@@ -15,37 +16,38 @@ import FrEIA.modules as FM
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-NUM_LAYERS = 12
+NUM_LAYERS = 16
 
-LR = 2e-3
+LR = 1e-3
 LR_DECAY = 0.95
-BATCH_SIZE = 512
+BATCH_SIZE = 256
 EPOCHS = 50
 
 
 def one_hot(y):
     """
-    y: (B) int 0-9
-    return: (B, 10) one hot.
+    y: Tensor int (B) 0-9.
+    return: Tensor int (B, 10) one hot.
     """
-    return nn.functional.one_hot(torch.tensor(y), num_classes=10)
+    return nn.functional.one_hot(y, num_classes=10)
 
 
 def load_data():
     transform = T.ToTensor()
+    target_transform = lambda y: one_hot(torch.tensor(y))
     train_data = datasets.MNIST(
         root="mnist",
         train=True,
         download=True,
         transform=transform,
-        target_transform=one_hot,
+        target_transform=target_transform,
     )
     test_data = datasets.MNIST(
         root="mnist",
         train=False,
         download=True,
         transform=transform,
-        target_transform=one_hot,
+        target_transform=target_transform,
     )
 
     loader_args = {
@@ -60,13 +62,15 @@ def load_data():
 def make_model():
     def fc_subnet(dims_in, dims_out):
         return nn.Sequential(
-            nn.Linear(dims_in, 256),
+            nn.Linear(dims_in, 128),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(256, 256),
+
+            nn.Linear(128, 128),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(256, dims_out),
+
+            nn.Linear(128, dims_out),
         )
 
     # Create INN.
@@ -77,7 +81,7 @@ def make_model():
             cond=0,
             cond_shape=[10],
             subnet_constructor=fc_subnet,
-    )
+        )
 
     # Initialize weights.
     """
@@ -89,13 +93,17 @@ def make_model():
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("log_dir")
+    args = parser.parse_args()
+
     train_loader, test_loader = load_data()
     model = make_model().to(DEVICE)
 
     optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
     lr_decay = torch.optim.lr_scheduler.ExponentialLR(optim, LR_DECAY)
 
-    logger = SummaryWriter("mnist_log_12layer")
+    logger = SummaryWriter(args.log_dir)
     global_step = 0
     for epoch in range(EPOCHS):
         model.train()
@@ -114,6 +122,7 @@ def main():
             optim.step()
             optim.zero_grad()
 
+            # Logging.
             logger.add_scalar("train/loss", loss.item(), global_step)
             logger.add_scalar("train/lr", optim.param_groups[0]["lr"], global_step)
             pbar.set_description(f"Train epoch {epoch}: loss={loss.item():.3f}")
@@ -121,7 +130,7 @@ def main():
 
         lr_decay.step()
 
-        # Generate tests.
+        # Generate test samples.
         print("Test epoch", epoch)
         model.eval()
         with torch.no_grad():
