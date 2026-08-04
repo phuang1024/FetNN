@@ -8,12 +8,12 @@ from torchvision.utils import make_grid
 from tqdm import tqdm
 
 from data import load_data, one_hot
-from model import make_model
+from model import make_model, init_weights
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 LR = 5e-4
-EPOCHS = 15
+EPOCHS = 32
 
 TEST_BS = 16
 
@@ -32,6 +32,10 @@ def nll_loss(z, jac):
 
 
 def generate_samples(model, z_scale):
+    """Generate random testing samples.
+    Labels (condition) random.
+    Latent from a normal dist.
+    """
     with torch.no_grad():
         labels = one_hot(torch.randint(0, 9, [TEST_BS])).to(DEVICE)
         z = torch.randn((TEST_BS, 784)).to(DEVICE) * z_scale
@@ -49,12 +53,13 @@ def main():
 
     train_loader, test_loader = load_data()
     model = make_model().to(DEVICE)
+    init_weights(model)
     print(model)
     print("Total num params:", sum(p.numel() for p in model.parameters()))
     print("Trainable num params:", sum(p.numel() for p in model.parameters() if p.requires_grad))
 
     optim = torch.optim.Adam(model.parameters(), LR, weight_decay=1e-5)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 5, 0.3)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 8, 0.4)
 
     logger = SummaryWriter(args.log_dir)
     global_step = 0
@@ -94,6 +99,7 @@ def main():
 
         x = generate_samples(model, 0)
         logger.add_image("test/vis_z0", make_grid(x, 4), global_step)
+
 
 if __name__ == "__main__":
     main()

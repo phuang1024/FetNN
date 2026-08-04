@@ -10,7 +10,7 @@ BATCH_SIZE = 256
 
 
 def one_hot(y):
-    """
+    """Convert int labels into one hot.
     y: Tensor int (B) 0-9.
     return: Tensor int (B, 10) one hot.
     """
@@ -18,13 +18,19 @@ def one_hot(y):
 
 
 def load_data():
+    """Create dataloaders for MNIST.
+    """
     x_trans = T.Compose([
         T.ToTensor(),
         T.Normalize([X_MEAN], [X_STD]),
+
+        # Augs.
+        T.GaussianNoise(0, 0.08),
+        T.RandomResizedCrop((28, 28), (0.6, 1), (0.9, 1 / 0.9)),
     ])
     def y_trans(y):
         return one_hot(torch.tensor(y))
-        
+
     train_data = datasets.MNIST(
         root="mnist",
         train=True,

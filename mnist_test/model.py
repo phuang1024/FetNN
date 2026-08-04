@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 import FrEIA.framework as FF
@@ -7,6 +8,9 @@ NUM_LAYERS = 20
 
 
 def fc_subnet(dims_in, dims_out):
+    """Fully connected subnet for each INN layer.
+    Input size: 784/2 + 10
+    """
     return nn.Sequential(
         nn.Linear(dims_in, 512),
         nn.LeakyReLU(),
@@ -14,21 +18,9 @@ def fc_subnet(dims_in, dims_out):
     )
 
 
-"""
 def make_model():
-    model = FF.SequenceINN(28 * 28)
-    for i in range(NUM_LAYERS):
-        model.append(
-            FM.AllInOneBlock,
-            cond=0,
-            cond_shape=(10,),
-            subnet_constructor=fc_subnet,
-            affine_clamping=1,
-        )
-    return model
-"""
-
-def make_model():
+    """Use Graph API to create cINN model.
+    """
     cond = FF.ConditionNode(10)
 
     nodes = []
@@ -53,3 +45,9 @@ def make_model():
     nodes.append(cond)
     model = FF.ReversibleGraphNet(nodes)
     return model
+
+
+def init_weights(model):
+    for param in model.parameters():
+        if param.requires_grad:
+            param.data = 0.01 * torch.randn_like(param)
