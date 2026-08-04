@@ -14,6 +14,7 @@ def fc_subnet(dims_in, dims_out):
     )
 
 
+"""
 def make_model():
     model = FF.SequenceINN(28 * 28)
     for i in range(NUM_LAYERS):
@@ -24,4 +25,31 @@ def make_model():
             subnet_constructor=fc_subnet,
             affine_clamping=1,
         )
+    return model
+"""
+
+def make_model():
+    cond = FF.ConditionNode(10)
+
+    nodes = []
+    nodes.append(FF.InputNode(784))
+    for i in range(NUM_LAYERS):
+        nodes.append(FF.Node(
+            nodes[-1],
+            FM.PermuteRandom,
+            {"seed": i},
+        ))
+        nodes.append(FF.Node(
+            nodes[-1],
+            FM.GLOWCouplingBlock,
+            {
+                "subnet_constructor": fc_subnet,
+                "clamp": 1,
+            },
+            conditions=cond,
+        ))
+
+    nodes.append(FF.OutputNode(nodes[-1]))
+    nodes.append(cond)
+    model = FF.ReversibleGraphNet(nodes)
     return model
