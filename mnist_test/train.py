@@ -72,7 +72,7 @@ def main():
             # x: (B, 784). y: (B, 10).
 
             # Forward.
-            z, jac = model(x, [y])
+            z, jac = model(x, y)
             z_mse, jac, nll = nll_loss(z, jac)
 
             nll.backward()

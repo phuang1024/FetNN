@@ -13,7 +13,7 @@ def fc_subnet(dims_in, dims_out):
     """
     return nn.Sequential(
         nn.Linear(dims_in, 512),
-        nn.LeakyReLU(),
+        nn.ReLU(),
         nn.Linear(512, dims_out),
     )
 
@@ -43,11 +43,18 @@ def make_model():
 
     nodes.append(FF.OutputNode(nodes[-1]))
     nodes.append(cond)
-    model = FF.ReversibleGraphNet(nodes)
+    model = FF.ReversibleGraphNet(nodes, verbose=False)
     return model
 
 
 def init_weights(model):
-    for param in model.parameters():
+    for name, param in model.named_parameters():
         if param.requires_grad:
+            """
+            if name.endswith(("2.weight", "2.bias")):
+                # Last layer.
+                param.data = torch.zeros_like(param.data)
+            else:
+                param.data = 1e-3 * torch.randn_like(param)
+            """
             param.data = 0.01 * torch.randn_like(param)

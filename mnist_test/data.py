@@ -25,8 +25,8 @@ def load_data():
         T.Normalize([X_MEAN], [X_STD]),
 
         # Augs.
-        T.GaussianNoise(0, 0.08),
-        T.RandomResizedCrop((28, 28), (0.6, 1), (0.9, 1 / 0.9)),
+        T.GaussianNoise(0, 0.08, clip=False),
+        #T.RandomResizedCrop((28, 28), (0.6, 1), (0.9, 1 / 0.9)),
     ])
     def y_trans(y):
         return one_hot(torch.tensor(y))
