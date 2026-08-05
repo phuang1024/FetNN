@@ -1,10 +1,16 @@
 """Load data from CSV.
 Run this file to visualize data.
+
+Usage during training:
+    Call load_ldmos_degr_data
+        Will automatically apply log to some axes.
+    Call pad_data
 """
 
 import csv
 
 import numpy as np
+import torch
 
 # Whether to log features for the Degradation dataset.
 DEGR_X_LOG = (
@@ -67,7 +73,26 @@ def load_ldmos_degr_data(file):
     return labels, x, y
 
 
+def pad_data(x, y):
+    """Pad whichever has less features with zeros,
+    along the feature dim.
+    """
+    if x.shape[1] < y.shape[1]:
+        x = torch.cat((
+            x,
+            torch.zeros((x.shape[0], y.shape[1] - x.shape[1]), dtype=x.dtype),
+        ))
+    else:
+        y = torch.cat((
+            y,
+            torch.zeros((y.shape[0], x.shape[1] - y.shape[1]), dtype=y.dtype),
+        ))
+    return x, y
+
+
 def vis_data(labels, x, y):
+    """Plot hist of each feature.
+    """
     def add_plot(data, index):
         plt.subplot(5, 3, index + 1)
         plt.hist(data, bins=50)
