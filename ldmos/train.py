@@ -14,6 +14,8 @@ from model import make_model
 
 @dataclass
 class Logging:
+    """Some logging utils.
+    """
     writer: SummaryWriter
     step: int = 0
     epoch: int = 0
@@ -39,21 +41,22 @@ class Logging:
 
 
 def nll_loss(z, jac):
-    """
+    """Negative log likelihood loss.
+
     z: (B, D) latent variable.
     jac: (B,) jacobian magnitude.
     """
-    z_mse = torch.mean(z**2) / 2
+    z_mag = torch.mean(z**2) / 2
     jac = torch.mean(jac) / z.shape[1]
-    nll = z_mse - jac
-    return z_mse, jac, nll
+    nll = z_mag - jac
+    return z_mag, jac, nll
 
 
 def train_epoch(model, optim, train_loader, log: Logging):
     model.train()
     for x, y in (pbar := tqdm(train_loader)):
         z, jac = model(x, [y])
-        z_mse, jac, nll = nll_loss(z, jac)
+        z_mag, jac, nll = nll_loss(z, jac)
 
         nll.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
@@ -61,18 +64,35 @@ def train_epoch(model, optim, train_loader, log: Logging):
         optim.zero_grad()
 
         log.log("train", pbar,
-            z_mse=z_mse.item(),
+            z_mag=z_mag.item(),
             log_jac=jac.item(),
             nll=nll.item(),
             lr=optim.param_groups[0]["lr"],
         )
 
+    pbar.close()
+
 
 @torch.no_grad()
-def val_epoch(model, optim, val_loader, log: Logging):
+def val_epoch(model, val_loader, log: Logging):
     model.eval()
+    z_mag_moment = 0
+    jac_moment = 0
+    nll_moment = 0
     for x, y in (pbar := tqdm(val_loader)):
-        pass
+        z, jac = model(x, [y])
+        z_mag, jac, nll = nll_loss(z, jac)
+        z_mag_moment += z_mag.item()
+        jac_moment += jac.item()
+        nll_moment += nll.item()
+
+    log.log("val", pbar,
+        z_mag=z_mag_moment / len(val_loader),
+        log_jac=jac_moment / len(val_loader),
+        nll=nll_moment / len(val_loader),
+        inc_step=False,
+    )
+    pbar.close()
 
 
 def main():
@@ -104,7 +124,7 @@ def main():
     for epoch in range(EPOCHS):
         log.epoch = epoch + 1
         train_epoch(model, optim, train_loader, log)
-        val_epoch(model, optim, val_loader, log)
+        val_epoch(model, val_loader, log)
 
 
 if __name__ == "__main__":
