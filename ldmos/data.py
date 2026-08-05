@@ -1,36 +1,44 @@
 """Load data from CSV.
 Run this file to visualize data.
-
-Usage during training:
-    Call load_ldmos_degr_data
-        Will automatically apply log to some axes.
-    Call pad_data
 """
 
 import csv
 
 import numpy as np
 import torch
+from torch.utils.data import Dataset
+
+from constants import *
 
 # Whether to log features for the Degradation dataset.
 DEGR_X_LOG = (
-    False,
-    False,
-    True,
-    True,
-    True,
-    False,
-    False,
-    False,
-    False,
-    False,
+    False, False,
+    True, True, True,
+    False, False, False,
+    False, False,
 )
 DEGR_Y_LOG = (
-    False,
-    False,
-    True,
-    False
+    False, False, True, False
 )
+
+
+class ListDataset(Dataset):
+    """
+    Given:
+        x: (N, D)
+        y: (N, D2)
+    Generates pairs of x[i], y[i].
+    """
+
+    def __init__(self, x, y):
+        self.x = torch.tensor(x).float().to(DEVICE)
+        self.y = torch.tensor(y).float().to(DEVICE)
+
+    def __len__(self):
+        return self.x.shape[0]
+
+    def __getitem__(self, idx):
+        return self.x[idx], self.y[idx]
 
 
 def process_data(labels, x, y, x_log, y_log):
@@ -71,23 +79,6 @@ def load_ldmos_degr_data(file):
     y = data[:, 10:]
     process_data(labels, x, y, DEGR_X_LOG, DEGR_Y_LOG)
     return labels, x, y
-
-
-def pad_data(x, y):
-    """Pad whichever has less features with zeros,
-    along the feature dim.
-    """
-    if x.shape[1] < y.shape[1]:
-        x = torch.cat((
-            x,
-            torch.zeros((x.shape[0], y.shape[1] - x.shape[1]), dtype=x.dtype),
-        ))
-    else:
-        y = torch.cat((
-            y,
-            torch.zeros((y.shape[0], x.shape[1] - y.shape[1]), dtype=y.dtype),
-        ))
-    return x, y
 
 
 def vis_data(labels, x, y):
