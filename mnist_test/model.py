@@ -21,40 +21,19 @@ def fc_subnet(dims_in, dims_out):
 def make_model():
     """Use Graph API to create cINN model.
     """
-    cond = FF.ConditionNode(10)
-
-    nodes = []
-    nodes.append(FF.InputNode(784))
+    model = FF.SequenceINN(784)
     for i in range(NUM_LAYERS):
-        nodes.append(FF.Node(
-            nodes[-1],
-            FM.PermuteRandom,
-            {"seed": i},
-        ))
-        nodes.append(FF.Node(
-            nodes[-1],
+        model.append(FM.PermuteRandom)
+        model.append(
             FM.GLOWCouplingBlock,
-            {
-                "subnet_constructor": fc_subnet,
-                "clamp": 1,
-            },
-            conditions=cond,
-        ))
-
-    nodes.append(FF.OutputNode(nodes[-1]))
-    nodes.append(cond)
-    model = FF.ReversibleGraphNet(nodes, verbose=False)
+            cond=0,
+            cond_shape=[10],
+            subnet_constructor=fc_subnet,
+        )
     return model
 
 
 def init_weights(model):
-    for name, param in model.named_parameters():
+    for param in model.parameters():
         if param.requires_grad:
-            """
-            if name.endswith(("2.weight", "2.bias")):
-                # Last layer.
-                param.data = torch.zeros_like(param.data)
-            else:
-                param.data = 1e-3 * torch.randn_like(param)
-            """
             param.data = 0.01 * torch.randn_like(param)

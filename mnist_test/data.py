@@ -1,20 +1,10 @@
 import torch
+from torch.nn.functional import one_hot
 from torch.utils.data import DataLoader
 import torchvision.datasets as datasets
 import torchvision.transforms.v2 as T
 
-X_MEAN = 0.128
-X_STD = 0.305
-
 BATCH_SIZE = 256
-
-
-def one_hot(y):
-    """Convert int labels into one hot.
-    y: Tensor int (B) 0-9.
-    return: Tensor int (B, 10) one hot.
-    """
-    return torch.nn.functional.one_hot(y, num_classes=10)
 
 
 def load_data():
@@ -22,14 +12,13 @@ def load_data():
     """
     x_trans = T.Compose([
         T.ToTensor(),
-        T.Normalize([X_MEAN], [X_STD]),
-
-        # Augs.
-        T.GaussianNoise(0, 0.08, clip=False),
+        # Noise is necessary to prevent large jacobian.
+        T.GaussianNoise(0, 0.1, clip=False),
+        # RRCrop seems to work fine. Might need regularization.
         #T.RandomResizedCrop((28, 28), (0.6, 1), (0.9, 1 / 0.9)),
     ])
     def y_trans(y):
-        return one_hot(torch.tensor(y))
+        return one_hot(torch.tensor(y), num_classes=10)
 
     train_data = datasets.MNIST(
         root="mnist",

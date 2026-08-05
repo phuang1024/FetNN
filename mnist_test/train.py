@@ -2,6 +2,7 @@ import argparse
 import os
 
 import torch
+from torch.nn.functional import one_hot
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import make_grid
 
@@ -37,7 +38,7 @@ def generate_samples(model, z_scale):
     Latent from a normal dist.
     """
     with torch.no_grad():
-        labels = one_hot(torch.randint(0, 9, [TEST_BS])).to(DEVICE)
+        labels = one_hot(torch.randint(0, 9, [TEST_BS]), num_classes=10).to(DEVICE)
         z = torch.randn((TEST_BS, 784)).to(DEVICE) * z_scale
 
         x = model(z, [labels], jac=False, rev=True)[0]
@@ -72,7 +73,7 @@ def main():
             # x: (B, 784). y: (B, 10).
 
             # Forward.
-            z, jac = model(x, y)
+            z, jac = model(x, [y])
             z_mse, jac, nll = nll_loss(z, jac)
 
             nll.backward()
