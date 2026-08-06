@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
 
 from constants import *
-from data import load_ldmos_degr_data, ListDataset
+from data import LdmosDegrData
 from model import make_model
 
 
@@ -101,8 +101,7 @@ def main():
     parser.add_argument("log_dir")
     args = parser.parse_args()
 
-    data_labels, x_data, y_data = load_ldmos_degr_data(args.data)
-    dataset = ListDataset(x_data, y_data)
+    dataset = LdmosDegrData(args.data)
     train_len = int(len(dataset) * 0.8)
     val_len = len(dataset) - train_len
     train_data, val_data = random_split(dataset, (train_len, val_len))

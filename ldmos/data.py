@@ -10,101 +10,98 @@ from torch.utils.data import Dataset
 
 from constants import *
 
-# Whether to log features for the Degradation dataset.
-DEGR_X_LOG = (
-    False, False,
-    True, True, True,
-    False, False, False,
-    False, False,
-)
-DEGR_Y_LOG = (
-    False, False, True, False
-)
 
-
-class ListDataset(Dataset):
+class MosDataset(Dataset):
+    """Dataset base class for MOS data generated with TCAD.
+    X is list of scalar recipe params. Y is list of scalar electrical features.
     """
-    Given:
-        x: (N, D)
-        y: (N, D2)
-    Generates pairs of x[i], y[i].
-    """
+    x_size: int
+    """First N features (in csv) are X."""
+    log: list[bool]
+    """Whether to log each feature."""
 
-    def __init__(self, x, y):
-        self.x = torch.tensor(x).float().to(DEVICE)
-        self.y = torch.tensor(y).float().to(DEVICE)
+    data: torch.Tensor
+    means: list[float]
+    stds: list[float]
+
+    def __init__(self, path):
+        """Initialize from CSV file.
+        """
+        self.load_data(path)
+        self.preprocess_data()
+
+    def load_data(self, path):
+        """Sets ``self.data`` and ``self.labels``.
+        """
+        self.data = []
+        with open(path) as fp:
+            reader = csv.reader(fp)
+            for i, line in enumerate(reader):
+                if i == 0:
+                    self.labels = line
+                else:
+                    self.data.append(list(map(float, line)))
+        self.data = torch.tensor(self.data, dtype=torch.float)
+
+    def preprocess_data(self):
+        """Logs and normalizes features.
+        Sets ``self.means`` and ``self.stds``.
+        """
+        self.means = []
+        self.stds = []
+        for i in range(self.data.shape[1]):
+            if self.log[i]:
+                self.data[:, i] = torch.log(self.data[:, i])
+
+            mean = torch.mean(self.data[:, i]).item()
+            std = torch.std(self.data[:, i]).item()
+            self.data[:, i] = (self.data[:, i] - mean) / std
+            self.means.append(mean)
+            self.stds.append(std)
+
+        self.data = self.data.to(DEVICE)
 
     def __len__(self):
-        return self.x.shape[0]
+        return self.data.shape[0]
 
-    def __getitem__(self, idx):
-        return self.x[idx], self.y[idx]
-
-
-def process_data(labels, x, y, x_log, y_log):
-    """Normalize all feature axes.
-    Log selected features.
-
-    x, y: ndarray (N, D) data.
-    x_log, y_log: ndarray bool (D,), whether to log each feature.
-    """
-    def process_array(data, do_log, index_offset=0):
-        for i in range(data.shape[1]):
-            if do_log[i]:
-                data[:, i] = np.log(data[:, i])
-                labels[i + index_offset] += " (log)"
-            mean = np.mean(data[:, i])
-            std = np.std(data[:, i])
-            data[:, i] = (data[:, i] - mean) / std
-
-    process_array(x, x_log)
-    process_array(y, y_log, x.shape[1])
+    def __getitem__(self, index):
+        x = self.data[index, :self.x_size]
+        y = self.data[index, self.x_size:]
+        return x, y
 
 
-def load_ldmos_degr_data(file):
-    """Load csv data from LDMOS Degradation template.
-    10X, 4Y.
-    """
-    with open(file) as fp:
-        reader = csv.reader(fp)
-        data = []
-        for i, line in enumerate(reader):
-            if i == 0:
-                labels = line
-            else:
-                data.append(list(map(float, line)))
-    data = np.array(data)
+class LdmosDegrData(MosDataset):
+    x_size = 10
+    log = (
+        False, False,
+        True, True, True,
+        False, False, False,
+        False, False,
 
-    x = data[:, :10]
-    y = data[:, 10:]
-    process_data(labels, x, y, DEGR_X_LOG, DEGR_Y_LOG)
-    return labels, x, y
+        False, False, True, False
+    )
 
 
-def vis_data(labels, x, y):
+def vis_data(dataset: MosDataset):
     """Plot hist of each feature.
     """
-    def add_plot(data, index):
-        plt.subplot(5, 3, index + 1)
-        plt.hist(data, bins=50)
-        plt.title(labels[index])
-
+    import matplotlib.pyplot as plt
     plt.figure(figsize=(20, 20))
-    index = 0
-    for i in range(x.shape[1]):
-        add_plot(x[:, i], index)
-        index += 1
-    for i in range(y.shape[1]):
-        add_plot(y[:, i], index)
-        index += 1
+
+    for i in range(dataset.data.shape[1]):
+        plt.subplot(5, 3, i + 1)
+        plt.hist(dataset.data[:, i], bins=50)
+        plt.title(f"{dataset.labels[i]}: log={dataset.log[i]}, mean={dataset.means[i]:.3f}, std={dataset.stds[i]:.3f}")
 
     plt.tight_layout()
     plt.savefig("data.jpg")
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    labels, x, y = load_ldmos_degr_data("new_data_4.csv")
-    print("x:", x.shape, x.dtype)
-    print("y:", y.shape, y.dtype)
-    vis_data(labels, x, y)
+    dataset = LdmosDegrData("new_data_4.csv")
+    print("Dataset length:", len(dataset))
+    x, y = dataset[0]
+    print("  x:", x.shape, x.dtype, x)
+    print("  y:", y.shape, y.dtype, y)
+
+    vis_data(dataset)
