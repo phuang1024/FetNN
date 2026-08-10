@@ -76,20 +76,21 @@ def train_epoch(model, optim, train_loader, log: Logging):
 @torch.no_grad()
 def val_epoch(model, val_loader, log: Logging):
     model.eval()
-    z_mag_moment = 0
-    jac_moment = 0
-    nll_moment = 0
+    total_z_loss = 0
+    total_x_loss = 0
     for x, y in (pbar := tqdm(val_loader)):
+        # Forward NLL loss for Z.
         z, jac = model(x, [y])
-        z_mag, jac, nll = nll_loss(z, jac)
-        z_mag_moment += z_mag.item()
-        jac_moment += jac.item()
-        nll_moment += nll.item()
+        _, _, loss = nll_loss(z, jac)
+        total_z_loss += loss.item()
+
+        # Backward MSE loss for X.
+        pred_x = model(torch.zeros_like(x, device=DEVICE), [y], rev=True, jac=False)[0]
+        total_x_loss += torch.nn.functional.mse_loss(pred_x, x)
 
     log.log("val", pbar,
-        z_mag=z_mag_moment / len(val_loader),
-        log_jac=jac_moment / len(val_loader),
-        nll=nll_moment / len(val_loader),
+        z_nll=total_z_loss / len(val_loader),
+        x_mse_loss=total_x_loss / len(val_loader),
         inc_step=False,
     )
     pbar.close()
