@@ -98,9 +98,21 @@ def val_epoch(model, val_loader, log: Logging, dataset: MosDataset):
 
     # Save some unnormalized generated samples (from last iter of val_loader).
     sample_text = ""
+    dim_x = pred_x.shape[1]
     for i in range(pred_x.shape[0]):
-        unnorm_x = dataset.unnormalize(pred_x[i].unsqueeze(0))
-        sample_text += f"y={y[i]}, x={unnorm_x}\n"
+        # Concat (pred_x, y) logits tensor. Shape (1, Dx + Dy)
+        logits_xy = torch.zeros([1, dim_x + y.shape[1]])
+        logits_xy[0, :dim_x] = pred_x[i]
+        logits_xy[0, dim_x:] = y[i]
+        sample_text += f"Sample {i}:\n"
+        sample_text += f"  LogitX:  {logits_xy[0, :dim_x]}\n"
+        sample_text += f"  LogitY:  {logits_xy[0, dim_x:]}\n"
+
+        # Unnorm (in place op).
+        unnorm_xy = dataset.unnormalize(logits_xy)
+        sample_text += f"  UnnormX: {unnorm_xy[0, :dim_x]}\n"
+        sample_text += f"  UnnormY: {unnorm_xy[0, dim_x:]}\n"
+
     log.writer.add_text("val/samples", sample_text, global_step=log.step)
 
 
