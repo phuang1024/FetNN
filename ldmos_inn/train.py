@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
 
 from constants import *
-from data import LdmosDegrData
+from data import LdmosDegrData, MosDataset
 from model import make_model
 
 
@@ -74,7 +74,7 @@ def train_epoch(model, optim, train_loader, log: Logging):
 
 
 @torch.no_grad()
-def val_epoch(model, val_loader, log: Logging):
+def val_epoch(model, val_loader, log: Logging, dataset: MosDataset):
     model.eval()
     total_z_loss = 0
     total_x_loss = 0
@@ -84,8 +84,9 @@ def val_epoch(model, val_loader, log: Logging):
         _, _, loss = nll_loss(z, jac)
         total_z_loss += loss.item()
 
-        # Backward MSE loss for X.
-        pred_x = model(torch.zeros_like(x, device=DEVICE), [y], rev=True, jac=False)[0]
+        # Reverse direction MSE loss for X.
+        zeros_z = torch.zeros_like(x, device=DEVICE)
+        pred_x = model(zeros_z, [y], rev=True, jac=False)[0]
         total_x_loss += torch.nn.functional.mse_loss(pred_x, x)
 
     log.log("val", pbar,
@@ -94,6 +95,13 @@ def val_epoch(model, val_loader, log: Logging):
         inc_step=False,
     )
     pbar.close()
+
+    # Save some unnormalized generated samples (from last iter of val_loader).
+    sample_text = ""
+    for i in range(pred_x.shape[0]):
+        unnorm_x = dataset.unnormalize(pred_x[i].unsqueeze(0))
+        sample_text += f"y={y[i]}, x={unnorm_x}\n"
+    log.writer.add_text("val/samples", sample_text, global_step=log.step)
 
 
 def main():
@@ -107,12 +115,8 @@ def main():
     val_len = len(dataset) - train_len
     train_data, val_data = random_split(dataset, (train_len, val_len))
 
-    loader_args = {
-        "batch_size": BATCH_SIZE,
-        "shuffle": True,
-    }
-    train_loader = DataLoader(train_data, **loader_args)
-    val_loader = DataLoader(val_data, **loader_args)
+    train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
+    val_loader = DataLoader(val_data, batch_size=BATCH_SIZE, shuffle=False)
 
     model = make_model(X_DIM, Y_DIM).to(DEVICE)
     print(model)
@@ -124,7 +128,7 @@ def main():
     for epoch in range(EPOCHS):
         log.epoch = epoch + 1
         train_epoch(model, optim, train_loader, log)
-        val_epoch(model, val_loader, log)
+        val_epoch(model, val_loader, log, dataset)
 
 
 if __name__ == "__main__":

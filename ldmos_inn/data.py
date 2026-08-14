@@ -61,6 +61,18 @@ class MosDataset(Dataset):
 
         self.data = self.data.to(DEVICE)
 
+    def unnormalize(self, data):
+        """Undo the normalize and log (given logits).
+        data: Tensor (B, D).
+            If D dimension is smaller than original CSV data,
+            data is assumed to be the first D columns.
+        """
+        for i in range(data.shape[1]):
+            data[:, i] = data[:, i] * self.stds[i] + self.means[i]
+            if self.log[i]:
+                data[:, i] = torch.exp(data[:, i])
+        return data
+
     def __len__(self):
         return self.data.shape[0]
 
