@@ -1,5 +1,9 @@
+"""cINN training and validation.
+"""
+
 import argparse
 from dataclasses import dataclass
+from pathlib import Path
 
 from tqdm import tqdm
 
@@ -11,37 +15,14 @@ from constants import *
 from data import LdmosDegrData, MosDataset
 from model import make_model
 
-
-@dataclass
-class Logging:
-    """Some logging utils.
-    """
-    writer: SummaryWriter
-    step: int = 0
-    epoch: int = 0
-
-    @classmethod
-    def from_dir(cls, dir):
-        return Logging(SummaryWriter(dir))
-
-    def log(self, prefix, pbar, inc_step=True, **kwargs):
-        """Add scalars to both TB and pbar.
-        """
-        desc = prefix + " "
-        for k, v in kwargs.items():
-            if type(v) is float:
-                desc += f"{k}={v:.3f} "
-            else:
-                desc += f"{k}={v}"
-            self.writer.add_scalar(f"{prefix}/{k}", v, self.step)
-        pbar.set_description(desc)
-
-        if inc_step:
-            self.step += 1
+# Globals for progress tracking.
+epoch = 0
+global_step = 0
 
 
 def nll_loss(z, jac):
     """Negative log likelihood loss.
+    Want |z| to be low and jac to be high.
 
     z: (B, D) latent variable.
     jac: (B,) jacobian magnitude.
@@ -52,7 +33,8 @@ def nll_loss(z, jac):
     return z_mag, jac, nll
 
 
-def train_epoch(model, optim, train_loader, log: Logging):
+def train_epoch(model, optim, train_loader, writer):
+    global global_step
     model.train()
     for x, y in (pbar := tqdm(train_loader)):
         z, jac = model(x, [y])
@@ -63,18 +45,19 @@ def train_epoch(model, optim, train_loader, log: Logging):
         optim.step()
         optim.zero_grad()
 
-        log.log("train", pbar,
-            z_mag=z_mag.item(),
-            log_jac=jac.item(),
-            nll=nll.item(),
-            lr=optim.param_groups[0]["lr"],
-        )
-
+        writer.add_scalar("train/epoch", epoch, global_step)
+        writer.add_scalar("train/z_mag", z_mag.item(), global_step)
+        writer.add_scalar("train/jac", jac.item(), global_step)
+        writer.add_scalar("train/nll", nll.item(), global_step)
+        global_step += 1
     pbar.close()
 
 
 @torch.no_grad()
-def val_epoch(model, val_loader, log: Logging, dataset: MosDataset):
+def val_epoch(model, val_loader, dataset, writer):
+    """
+    dataset (MosDataset) is used for the unnormalize method.
+    """
     model.eval()
     total_z_loss = 0
     total_x_loss = 0
@@ -88,40 +71,30 @@ def val_epoch(model, val_loader, log: Logging, dataset: MosDataset):
         zeros_z = torch.zeros_like(x, device=DEVICE)
         pred_x = model(zeros_z, [y], rev=True, jac=False)[0]
         total_x_loss += torch.nn.functional.mse_loss(pred_x, x)
-
-    log.log("val", pbar,
-        z_nll=total_z_loss / len(val_loader),
-        x_mse_loss=total_x_loss / len(val_loader),
-        inc_step=False,
-    )
     pbar.close()
 
+    writer.add_scalar("val/nll", total_z_loss / len(val_loader), global_step)
+    writer.add_scalar("val/x_mse_loss", total_x_loss / len(val_loader), global_step)
+
     # Save some unnormalized generated samples (from last iter of val_loader).
-    sample_text = ""
-    dim_x = pred_x.shape[1]
+    # Concat (pred_x, y). Shape (B, Dx + Dy)
+    logits_xy = torch.zeros([y.shape[0], x.shape[1] + y.shape[1]])
     for i in range(pred_x.shape[0]):
-        # Concat (pred_x, y) logits tensor. Shape (1, Dx + Dy)
-        logits_xy = torch.zeros([1, dim_x + y.shape[1]])
-        logits_xy[0, :dim_x] = pred_x[i]
-        logits_xy[0, dim_x:] = y[i]
-        sample_text += f"Sample {i}:\n"
-        sample_text += f"  LogitX:  {logits_xy[0, :dim_x]}\n"
-        sample_text += f"  LogitY:  {logits_xy[0, dim_x:]}\n"
+        logits_xy[i, :x.shape[1]] = pred_x[i]
+        logits_xy[i, x.shape[1]:] = y[i]
+    unnorm_xy = dataset.unnormalize(logits_xy)
+    writer.add_tensor("val/samples", unnorm_xy, global_step=global_step)
 
-        # Unnorm (in place op).
-        unnorm_xy = dataset.unnormalize(logits_xy)
-        sample_text += f"  UnnormX: {unnorm_xy[0, :dim_x]}\n"
-        sample_text += f"  UnnormY: {unnorm_xy[0, dim_x:]}\n"
-
-    log.writer.add_text("val/samples", sample_text, global_step=log.step)
+    return unnorm_xy
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("data")
-    parser.add_argument("log_dir")
+    parser.add_argument("data", type=Path)
+    parser.add_argument("log_dir", type=Path)
     args = parser.parse_args()
 
+    # Make datasets.
     dataset = LdmosDegrData(args.data)
     train_len = int(len(dataset) * 0.8)
     val_len = len(dataset) - train_len
@@ -130,17 +103,22 @@ def main():
     train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_data, batch_size=BATCH_SIZE, shuffle=False)
 
+    # Make model and stuff.
     model = make_model(X_DIM, Y_DIM).to(DEVICE)
     print(model)
     print("Num params:", sum(p.numel() for p in model.parameters() if p.requires_grad))
-
     optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
 
-    log = Logging.from_dir(args.log_dir)
+    writer = SummaryWriter(args.log_dir)
+
+    global epoch
     for epoch in range(EPOCHS):
-        log.epoch = epoch + 1
-        train_epoch(model, optim, train_loader, log)
-        val_epoch(model, val_loader, log, dataset)
+        train_epoch(model, optim, train_loader, writer)
+        val_samples = val_epoch(model, val_loader, dataset, writer)
+
+        if epoch % 10 == 0 or epoch == EPOCHS - 1:
+            torch.save(val_samples, writer.log_dir / f"samples_e{epoch}.pt")
+            torch.save(model.state_dict(), writer.log_dir / f"model_e{epoch}.pt")
 
 
 if __name__ == "__main__":
