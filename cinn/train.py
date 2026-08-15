@@ -5,7 +5,7 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 
-from tqdm import tqdm
+from tqdm import trange
 
 import torch
 from torch.utils.data import DataLoader, random_split
@@ -36,7 +36,7 @@ def nll_loss(z, jac):
 def train_epoch(model, optim, train_loader, writer):
     global global_step
     model.train()
-    for x, y in (pbar := tqdm(train_loader)):
+    for x, y in train_loader:
         z, jac = model(x, [y])
         z_mag, jac, nll = nll_loss(z, jac)
 
@@ -50,7 +50,6 @@ def train_epoch(model, optim, train_loader, writer):
         writer.add_scalar("train/jac", jac.item(), global_step)
         writer.add_scalar("train/nll", nll.item(), global_step)
         global_step += 1
-    pbar.close()
 
 
 @torch.no_grad()
@@ -61,7 +60,7 @@ def val_epoch(model, val_loader, dataset, writer):
     model.eval()
     total_z_loss = 0
     total_x_loss = 0
-    for x, y in (pbar := tqdm(val_loader)):
+    for x, y in val_loader:
         # Forward NLL loss for Z.
         z, jac = model(x, [y])
         _, _, loss = nll_loss(z, jac)
@@ -71,7 +70,6 @@ def val_epoch(model, val_loader, dataset, writer):
         zeros_z = torch.zeros_like(x, device=DEVICE)
         pred_x = model(zeros_z, [y], rev=True, jac=False)[0]
         total_x_loss += torch.nn.functional.mse_loss(pred_x, x)
-    pbar.close()
 
     writer.add_scalar("val/nll", total_z_loss / len(val_loader), global_step)
     writer.add_scalar("val/x_mse_loss", total_x_loss / len(val_loader), global_step)
@@ -112,7 +110,7 @@ def main():
     writer = SummaryWriter(args.log_dir)
 
     global epoch
-    for epoch in range(EPOCHS):
+    for epoch in trange(EPOCHS):
         train_epoch(model, optim, train_loader, writer)
         val_samples = val_epoch(model, val_loader, dataset, writer)
 
