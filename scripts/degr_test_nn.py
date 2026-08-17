@@ -16,7 +16,7 @@ import torch
 def create_cmd_file(template_file, output_file, params):
     """Create a new cmd file with randomly generated parameters and save to par.csv."""
     # Params from NN.
-    lsti, tox, nwellD1, nwellD2, nwellD3,dose_energy1,dose_energy2,dose_energy3,aneal_temp,xn= params[:10]
+    lsti, tox, nwellD1, nwellD2, nwellD3,dose_energy1,dose_energy2,dose_energy3,aneal_temp,xn= params[:10].tolist()
     # The rest of the params.
     nn = 3
     Lextra = 2.5
