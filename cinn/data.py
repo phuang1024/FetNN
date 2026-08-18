@@ -14,6 +14,11 @@ from constants import *
 class MosDataset(Dataset):
     """Dataset base class for MOS data generated with TCAD.
     X is list of scalar recipe params. Y is list of scalar electrical features.
+
+    Usage:
+        Create a subclass and define params below.
+        On init, pass in the CSV data file.
+        For inference, use unnormalize() to convert from logits to recipe.
     """
     x_size: int
     """First N features (in csv) are X."""
@@ -79,7 +84,17 @@ class MosDataset(Dataset):
     def __getitem__(self, index):
         x = self.data[index, :self.x_size]
         y = self.data[index, self.x_size:]
+        if True:
+            self.augment(x, y)
         return x, y
+
+    def augment(self, x, y):
+        """In place.
+        """
+        # Random noise.
+        noise_mag = 1e-4
+        x += torch.randn_like(x) * noise_mag
+        y += torch.randn_like(y) * noise_mag
 
 
 class LdmosDegrData(MosDataset):

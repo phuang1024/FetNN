@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from constants import *
 from data import LdmosDegrData, MosDataset
-from model import make_model
+from model import make_model, init_weights
 
 # Globals for progress tracking.
 epoch = 0
@@ -103,6 +103,7 @@ def main():
 
     # Make model and stuff.
     model = make_model(X_DIM, Y_DIM).to(DEVICE)
+    init_weights(model, INIT_WEIGHT)
     print(model)
     print("Num params:", sum(p.numel() for p in model.parameters() if p.requires_grad))
     optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)

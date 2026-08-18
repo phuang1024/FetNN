@@ -15,7 +15,8 @@ def fc_subnet(dims_in, dims_out):
     """
     return nn.Sequential(
         nn.Linear(dims_in, 512),
-        nn.ReLU(),
+        nn.LeakyReLU(),
+        nn.Dropout(0.1),
         nn.Linear(512, dims_out),
     )
 

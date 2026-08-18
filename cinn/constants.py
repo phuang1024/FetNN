@@ -8,7 +8,10 @@ Y_DIM = 4
 NUM_BLOCKS = 8
 """Number of cINN coupling blocks."""
 
-BATCH_SIZE = 64
+INIT_WEIGHT = 1e-2
+"""Weight init magnitude."""
+
+BATCH_SIZE = 128
 LR = 1e-4
-WEIGHT_DECAY = 0
-EPOCHS = 50
+WEIGHT_DECAY = 1e-5
+EPOCHS = 500
