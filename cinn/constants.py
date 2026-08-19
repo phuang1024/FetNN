@@ -5,7 +5,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 X_DIM = 10
 Y_DIM = 4
 
-NUM_BLOCKS = 8
+NUM_BLOCKS = 12
 """Number of cINN coupling blocks."""
 
 INIT_WEIGHT = 1e-2

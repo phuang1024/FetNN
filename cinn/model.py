@@ -14,10 +14,10 @@ def fc_subnet(dims_in, dims_out):
     """Fully connected subnet for each INN block.
     """
     return nn.Sequential(
-        nn.Linear(dims_in, 512),
+        nn.Linear(dims_in, 1024),
         nn.LeakyReLU(),
         nn.Dropout(0.1),
-        nn.Linear(512, dims_out),
+        nn.Linear(1024, dims_out),
     )
 
 
