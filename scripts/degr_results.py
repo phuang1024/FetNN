@@ -36,7 +36,7 @@ def read_tcad_results(file):
     ret = []
     for d in data:
         ret.append([d[i] for i in TCAD_COLS])
-    return np.array(ret)
+    return np.array(ret, dtype=float)
 
 
 def read_nn_results(file):
@@ -45,7 +45,7 @@ def read_nn_results(file):
     ret = []
     for d in data:
         ret.append([d[i] for i in NN_COLS])
-    return np.array(ret)
+    return np.array(ret, dtype=float)
 
 
 def main():
@@ -63,8 +63,11 @@ def main():
     # Print results.
     for i in range(min(len(tcad_data), len(nn_data))):
         print(f"Sim {i+1} | GT   |")
-        for j in range(len(LEGEND)):
-            print(f"{LEGEND[j]:5} | {nn_data[i][j]:5} | {tcad_data[i][j]:5}")
+        # Specific formatting.
+        print(f"{LEGEND[0]:5} | {nn_data[i][0] * 1e3:.3f}e-3  | {tcad_data[i][0] * 1e3:.3f}e-3")
+        print(f"{LEGEND[1]:5} | {nn_data[i][1]:.3f}    | {tcad_data[i][1]:.3f}")
+        print(f"{LEGEND[2]:5} | {nn_data[i][2] / 1e3:.3f}e3  | {tcad_data[i][2] / 1e3:.3f}e3")
+        print(f"{LEGEND[3]:5} | {nn_data[i][3]:.3f}     | {tcad_data[i][3]:.3f}")
 
 
 if __name__ == "__main__":
