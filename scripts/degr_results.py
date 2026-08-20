@@ -62,12 +62,14 @@ def main():
 
     # Print results.
     for i in range(min(len(tcad_data), len(nn_data))):
-        print(f"Sim {i+1} | GT   |")
+        rel_errors = (nn_data[i] - tcad_data[i]) / nn_data[i] * 100
+
+        print(f"Sim {i+1} | GT       | TCAD      | Rel error")
         # Specific formatting.
-        print(f"{LEGEND[0]:5} | {nn_data[i][0] * 1e3:.3f}e-3  | {tcad_data[i][0] * 1e3:.3f}e-3")
-        print(f"{LEGEND[1]:5} | {nn_data[i][1]:.3f}    | {tcad_data[i][1]:.3f}")
-        print(f"{LEGEND[2]:5} | {nn_data[i][2] / 1e3:.3f}e3  | {tcad_data[i][2] / 1e3:.3f}e3")
-        print(f"{LEGEND[3]:5} | {nn_data[i][3]:.3f}     | {tcad_data[i][3]:.3f}")
+        print(f"{LEGEND[0]:5} | {nn_data[i][0] * 1e3:.3f}e-3  | {tcad_data[i][0] * 1e3:.3f}e-3  | {rel_errors[0]:.1f}%")
+        print(f"{LEGEND[1]:5} | {nn_data[i][1]:.3f}    | {tcad_data[i][1]:.3f}     | {rel_errors[1]:.1f}%")
+        print(f"{LEGEND[2]:5} | {nn_data[i][2] / 1e3:.3f}e3  | {tcad_data[i][2] / 1e3:.3f}e3  | {rel_errors[2]:.1f}%")
+        print(f"{LEGEND[3]:5} | {nn_data[i][3]:.3f}     | {tcad_data[i][3]:.3f}     | {rel_errors[3]:.1f}%")
 
 
 if __name__ == "__main__":
