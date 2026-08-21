@@ -92,9 +92,8 @@ class MosDataset(Dataset):
         """In place.
         """
         # Random noise.
-        noise_mag = 1e-4
-        x += torch.randn_like(x) * noise_mag
-        y += torch.randn_like(y) * noise_mag
+        x += torch.randn_like(x) * DATA_NOISE
+        y += torch.randn_like(y) * DATA_NOISE
 
 
 class LdmosDegrData(MosDataset):
@@ -107,10 +106,22 @@ class LdmosDegrData(MosDataset):
 
         False, False, True, False
     )
+    """
+    # TODO testing all log.
+    log = (
+        True, True,
+        True, True, True,
+        True, True, True,
+        True, True,
+
+        True, True, True, True
+    )
+    """
 
 
 def vis_data(dataset: MosDataset):
     """Plot hist of each feature.
+    After logging and normalizing.
     """
     import matplotlib.pyplot as plt
     plt.figure(figsize=(20, 20))
@@ -125,7 +136,12 @@ def vis_data(dataset: MosDataset):
 
 
 if __name__ == "__main__":
-    dataset = LdmosDegrData("new_data_4.csv")
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("data")
+    args = parser.parse_args()
+
+    dataset = LdmosDegrData(args.data)
     print("Dataset length:", len(dataset))
     x, y = dataset[0]
     print("  x:", x.shape, x.dtype, x)
