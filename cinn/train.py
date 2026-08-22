@@ -64,12 +64,14 @@ def train_epoch(model, optim, train_loader, writer):
         # Train step.
         fwd_loss.backward()
         bwd_loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 2)
         optim.step()
         optim.zero_grad()
 
         # Logging.
         writer.add_scalar("train/epoch", epoch, global_step)
+        writer.add_scalar("train/lr", optim.param_groups[0]["lr"], global_step)
+
         writer.add_scalar("train/fwd_z_mag", fwd_z_mag.item(), global_step)
         writer.add_scalar("train/fwd_jac", fwd_jac.item(), global_step)
         writer.add_scalar("train/fwd_loss", fwd_loss.item(), global_step)
@@ -126,6 +128,7 @@ def main():
     init_weights(model, INIT_WEIGHT)
 
     optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=50, gamma=0.7)
 
     writer = SummaryWriter(args.log_dir)
 
@@ -140,6 +143,7 @@ def main():
     for epoch in trange(EPOCHS):
         train_epoch(model, optim, train_loader, writer)
         val_samples = val_epoch(model, val_loader, dataset, writer)
+        lr_scheduler.step()
 
         if epoch % 10 == 0 or epoch == EPOCHS - 1:
             torch.save(val_samples, args.log_dir / f"samples_e{epoch}.pt")
