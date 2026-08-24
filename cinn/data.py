@@ -75,7 +75,7 @@ class MosDataset(Dataset):
         for i in range(data.shape[1]):
             data[:, i] = data[:, i] * self.stds[i] + self.means[i]
             if self.log[i]:
-                data[:, i] = torch.exp(data[:, i])
+                data[:, i] = torch.expm1(data[:, i])
         return data
 
     def __len__(self):
