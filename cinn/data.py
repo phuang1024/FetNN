@@ -56,7 +56,7 @@ class MosDataset(Dataset):
         self.stds = []
         for i in range(self.data.shape[1]):
             if self.log[i]:
-                self.data[:, i] = torch.log(self.data[:, i])
+                self.data[:, i] = torch.log1p(self.data[:, i])
 
             mean = torch.mean(self.data[:, i]).item()
             std = torch.std(self.data[:, i]).item()
@@ -98,6 +98,7 @@ class MosDataset(Dataset):
 
 class LdmosDegrData(MosDataset):
     x_size = 10
+    """
     log = (
         False, False,
         True, True, True,
@@ -116,7 +117,6 @@ class LdmosDegrData(MosDataset):
 
         True, True, True, True
     )
-    """
 
 
 def vis_data(dataset: MosDataset):
