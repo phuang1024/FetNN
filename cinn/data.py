@@ -98,7 +98,6 @@ class MosDataset(Dataset):
 
 class LdmosDegrData(MosDataset):
     x_size = 10
-    """
     log = (
         False, False,
         True, True, True,
@@ -117,6 +116,7 @@ class LdmosDegrData(MosDataset):
 
         True, True, True, True
     )
+    """
 
 
 def vis_data(dataset: MosDataset):
