@@ -6,9 +6,10 @@ import csv
 
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader, random_split
 
-from constants import *
+DATA_NOISE = 1e-4
+"""Additive Gaussian noise augmentation magnitude."""
 
 
 class MosDataset(Dataset):
@@ -29,11 +30,12 @@ class MosDataset(Dataset):
     means: list[float]
     stds: list[float]
 
-    def __init__(self, path):
+    def __init__(self, path, device):
         """Initialize from CSV file.
         """
         self.load_data(path)
         self.preprocess_data()
+        self.device = device
 
     def load_data(self, path):
         """Sets ``self.data`` and ``self.labels``.
@@ -64,7 +66,7 @@ class MosDataset(Dataset):
             self.means.append(mean)
             self.stds.append(std)
 
-        self.data = self.data.to(DEVICE)
+        self.data = self.data.to(self.device)
 
     def unnormalize(self, data):
         """Undo the normalize and log (given logits).
@@ -117,6 +119,18 @@ class LdmosDegrData(MosDataset):
         True, True, True, True
     )
     """
+
+
+def split_train_val(dataset, ratio, batch_size):
+    """Helper func to split dataset.
+    """
+    train_len = int(len(dataset) * 0.8)
+    val_len = len(dataset) - train_len
+    train_data, val_data = random_split(dataset, (train_len, val_len))
+
+    train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
+    val_loader = DataLoader(val_data, batch_size=BATCH_SIZE, shuffle=False)
+    return train_loader, val_loader
 
 
 def vis_data(dataset: MosDataset):

@@ -5,19 +5,64 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 
-from tqdm import trange
-
+import FrEIA.framework as FF
+import FrEIA.modules as FM
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import trange
 
-from constants import *
-from data import LdmosDegrData, MosDataset
-from model import make_model, init_weights
+from data import LdmosDegrData, split_train_val
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+NUM_BLOCKS = 16
+"""Number of cINN coupling blocks."""
+INIT_WEIGHT = 1e-2
+"""Weight init magnitude."""
+
+BWD_Z_MAG = 0.1
+
+BATCH_SIZE = 128
+LR = 3e-4
+WEIGHT_DECAY = 2e-5
+EPOCHS = 250
 
 # Globals for progress tracking.
 epoch = 0
 global_step = 0
+
+
+def make_model(dim, cond_dim, init_std):
+    """
+    dim: Dimension of input and output.
+    cond_dim: Dimension of condition.
+    """
+    def fc_subnet(dims_in, dims_out):
+        """Fully connected subnet for each INN block.
+        """
+        return nn.Sequential(
+            nn.Linear(dims_in, 1024),
+            nn.LeakyReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(1024, dims_out),
+        )
+    
+    model = FF.SequenceINN(dim)
+    for _ in range(NUM_BLOCKS):
+        model.append(FM.PermuteRandom)
+        model.append(
+            FM.GLOWCouplingBlock,
+            cond=0,
+            cond_shape=[cond_dim],
+            subnet_constructor=fc_subnet,
+        )
+
+    for param in model.parameters():
+        if param.requires_grad:
+            param.data = init_std * torch.randn_like(param)
+    return model
 
 
 def bidir_loss(model, x, y):
@@ -115,17 +160,11 @@ def main():
     args = parser.parse_args()
 
     # Make datasets.
-    dataset = LdmosDegrData(args.data)
-    train_len = int(len(dataset) * 0.8)
-    val_len = len(dataset) - train_len
-    train_data, val_data = random_split(dataset, (train_len, val_len))
-
-    train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(val_data, batch_size=BATCH_SIZE, shuffle=False)
+    dataset = LdmosDegrData(args.data, DEVICE)
+    train_loader, val_loader = split_train_val(dataset, 0.8, BATCH_SIZE)
 
     # Make model and stuff.
-    model = make_model(dataset.x_size, dataset.data.shape[1] - dataset.x_size).to(DEVICE)
-    init_weights(model, INIT_WEIGHT)
+    model = make_model(dataset.x_size, dataset.data.shape[1] - dataset.x_size, INIT_WEIGHT).to(DEVICE)
 
     optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=50, gamma=0.7)
