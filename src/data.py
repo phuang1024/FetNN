@@ -33,9 +33,9 @@ class MosDataset(Dataset):
     def __init__(self, path, device):
         """Initialize from CSV file.
         """
+        self.device = device
         self.load_data(path)
         self.preprocess_data()
-        self.device = device
 
     def load_data(self, path):
         """Sets ``self.data`` and ``self.labels``.
@@ -124,12 +124,12 @@ class LdmosDegrData(MosDataset):
 def split_train_val(dataset, ratio, batch_size):
     """Helper func to split dataset.
     """
-    train_len = int(len(dataset) * 0.8)
+    train_len = int(len(dataset) * ratio)
     val_len = len(dataset) - train_len
     train_data, val_data = random_split(dataset, (train_len, val_len))
 
-    train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(val_data, batch_size=BATCH_SIZE, shuffle=False)
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False)
     return train_loader, val_loader
 
 
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     parser.add_argument("data")
     args = parser.parse_args()
 
-    dataset = LdmosDegrData(args.data)
+    dataset = LdmosDegrData(args.data, "cpu")
     print("Dataset length:", len(dataset))
     x, y = dataset[0]
     print("  x:", x.shape, x.dtype, x)
