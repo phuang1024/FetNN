@@ -1,6 +1,7 @@
 """Out of distribution detection by analyzing distr of INN hidden activations.
 """
 
+import matplotlib.pyplot as plt
 import torch
 
 from weiman_code import (
@@ -50,6 +51,7 @@ def inverse_hidden_stats(y_data):
 
     means = torch.stack(means)
     stds = torch.stack(stds)
+    print("Layer names:", layer_names)
     return means, stds, layer_names
 
 
@@ -68,7 +70,6 @@ def ood_z_score(y_base, y_test):
     base_mean_stds = torch.std(base_means, dim=1)
     base_std_means = torch.mean(base_stds, dim=1)
     base_std_stds = torch.std(base_stds, dim=1)
-    print(base_mean_means.shape)
 
     test_means, test_stds, _ = inverse_hidden_stats(y_test)
     # Compute z scores. (M, N).
@@ -81,15 +82,83 @@ def ood_z_score(y_base, y_test):
     return mean_zs, std_zs
 
 
+def rms_mean(data, dim=None):
+    """return sqrt(mean(square(data)))
+    """
+    return torch.sqrt(torch.mean(data ** 2, dim=dim))
+
+
 def main_z_score():
     """Print average z scores."""
     def print_score(y_test, name):
         mean_zs, std_zs = ood_z_score(y_train, y_test)
-        print(f"{name}: avg mean z: {torch.mean(mean_zs)}, avg std z: {torch.mean(std_zs)}")
+        print(f"{name}: avg mean z: {rms_mean(mean_zs)}, avg std z: {rms_mean(std_zs)}")
 
     print_score(y_train, "y_train")
     print_score(y_val, "y_val")
     print_score(y_fake_added, "y_fake_added")
 
 
-main_z_score()
+def main_2d_sweep():
+    """Sweep BV and Rsp and scatter plot OOD metric."""
+    X_MAX = 4
+
+    # BV and Rsp go [-X, X].
+    samples = torch.linspace(-X_MAX, X_MAX, 50)
+    bvs, rsps = torch.meshgrid(samples, samples)
+    # Shape (50*50,)
+    bvs = bvs.reshape(-1)
+    rsps = rsps.reshape(-1)
+
+    # (50*50, 4)
+    y_fake_sweep = torch.stack((
+        rsps,
+        bvs,
+        torch.zeros_like(rsps),
+        torch.zeros_like(rsps),
+    ), dim=1)
+
+    # Get per-layer, per-sample z scores.
+    mean_zs, std_zs = ood_z_score(y_train, y_fake_sweep)
+
+    def plot_score_heatmap(scores):
+        plt.scatter(bvs, rsps, c=scores, vmin=0, vmax=5)
+
+        plt.xlim(-X_MAX, X_MAX)
+        plt.ylim(-X_MAX, X_MAX)
+
+        plt.colorbar()
+        plt.xlabel("BV")
+        plt.ylabel("Rsp")
+
+
+    # Plot average score across layers, and overlay train dataset.
+    plt.figure()
+    # Two plots: One with heatmap, one with heatmap and train data.
+    for i in range(2):
+        plt.subplot(1, 2, i + 1)
+        plot_score_heatmap(rms_mean(std_zs, dim=0))
+
+    # Scatter train data on last plot.
+    plt.scatter(y_train[:, 1], y_train[:, 0], color="pink", alpha=0.5)
+
+    plt.suptitle("OOD $\sigma$ z-score, and y_train dataset")
+    plt.tight_layout()
+    plt.show()
+
+    # Plot heatmap per layer.
+    plt.figure()
+    for i in range(len(std_zs)):
+        plt.subplot(4, 4, i + 1)
+        plot_score_heatmap(std_zs[i])
+        #plt.title()
+
+    plt.suptitle("OOD $\sigma$ z-score per layer")
+    plt.tight_layout()
+    plt.show()
+
+
+if __name__ == "__main__":
+    torch.set_grad_enabled(False)
+    #main_z_score()
+    main_2d_sweep()
