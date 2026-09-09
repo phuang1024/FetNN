@@ -19,7 +19,7 @@ FLOW_SIGMA = 0
 
 EPOCHS = 100
 BATCH_SIZE = 32
-LR = 1e-3
+LR = 2e-4
 
 epoch = 0
 global_step = 0
@@ -36,11 +36,10 @@ class FlowFetModel(nn.Module):
 
         self.inp = nn.Linear(dx, dh)
         blocks = []
-        for _ in range(3):
+        for _ in range(4):
             blocks.append(nn.Sequential(
                 nn.Linear(dh, dh),
                 nn.LeakyReLU(),
-                nn.Linear(dh, dh),
             ))
         self.blocks = nn.ModuleList(blocks)
         self.head = nn.Linear(dh, dy)
