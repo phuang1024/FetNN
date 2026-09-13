@@ -40,7 +40,7 @@ class FlowFetModel(nn.Module):
         super().__init__()
 
         dim_in = (self.dim_latent + self.dim_cond + 1) * self.embed_dim
-        self.in_layer = nn.Linear(dim_in, self.dim_hidden)
+        self.input = nn.Linear(dim_in, self.dim_hidden)
 
         # Residual blocks.
         blocks = []
@@ -48,6 +48,7 @@ class FlowFetModel(nn.Module):
             blocks.append(nn.Sequential(
                 nn.Linear(self.dim_hidden, self.dim_hidden),
                 nn.LeakyReLU(),
+                nn.Dropout(0.1),
             ))
         self.blocks = nn.ModuleList(blocks)
 
@@ -63,7 +64,7 @@ class FlowFetModel(nn.Module):
         x = torch.cat([xt, cond, time], dim=-1)
         x = torch.cat([self.sin_embed(x[:, i]) for i in range(x.shape[1])], dim=1)
 
-        x = self.in_layer(x)
+        x = self.input(x)
         for b in self.blocks:
             x = x + b(x)
         x = self.head(x)

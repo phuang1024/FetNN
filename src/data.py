@@ -88,16 +88,15 @@ class MosDataset(Dataset):
         #index %= 1024
         x = self.data[index, :self.x_size]
         y = self.data[index, self.x_size:]
-        if False:
-            self.augment(x, y)
+        if True:
+            x, y = self.augment(x, y)
         return x, y
 
     def augment(self, x, y):
-        """In place.
-        """
         # Random noise.
-        x += torch.randn_like(x) * DATA_NOISE
-        y += torch.randn_like(y) * DATA_NOISE
+        x = x + torch.randn_like(x) * DATA_NOISE
+        y = y + torch.randn_like(y) * DATA_NOISE
+        return x, y
 
 
 class LdmosDegrData(MosDataset):
