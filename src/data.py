@@ -84,8 +84,6 @@ class MosDataset(Dataset):
         return self.data.shape[0]
 
     def __getitem__(self, index):
-        #TODO sanity check
-        index = 0
         x = self.data[index, :self.x_size]
         y = self.data[index, self.x_size:]
         if False:

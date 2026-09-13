@@ -121,28 +121,23 @@ def main_2d_sweep():
     # Get per-layer, per-sample z scores.
     mean_zs, std_zs = ood_z_score(y_train, y_fake_sweep)
 
-    def plot_score_heatmap(scores):
-        plt.scatter(bvs, rsps, c=scores, vmin=0, vmax=5)
-
-        plt.xlim(-X_MAX, X_MAX)
-        plt.ylim(-X_MAX, X_MAX)
-
-        plt.colorbar()
-        plt.xlabel("BV")
-        plt.ylabel("Rsp")
-
-
     # Plot average score across layers, and overlay train dataset.
     plt.figure()
     # Two plots: One with heatmap, one with heatmap and train data.
     for i in range(2):
         plt.subplot(1, 2, i + 1)
-        plot_score_heatmap(rms_mean(std_zs, dim=0))
+        plt.scatter(bvs, rsps, c=rms_mean(std_zs, dim=0), vmin=0, vmax=5)
+
+        plt.xlim(-X_MAX, X_MAX)
+        plt.ylim(-X_MAX, X_MAX)
+        plt.colorbar()
+        plt.xlabel("BV")
+        plt.ylabel("Rsp")
 
     # Scatter train data on last plot.
     plt.scatter(y_train[:, 1], y_train[:, 0], color="pink", alpha=0.5)
 
-    plt.suptitle("OOD $\sigma$ z-score, and y_train dataset")
+    plt.suptitle("OOD $\\sigma$ z-score, and y_train dataset")
     plt.tight_layout()
     plt.show()
 
@@ -150,11 +145,16 @@ def main_2d_sweep():
     plt.figure()
     for i in range(len(std_zs)):
         plt.subplot(4, 4, i + 1)
-        plot_score_heatmap(std_zs[i])
+        plt.scatter(bvs, rsps, c=std_zs[i], vmin=0, vmax=5)
+        plt.scatter(y_train[:, 1], y_train[:, 0], color="pink", alpha=0.3)
+
+        plt.xlim(-X_MAX, X_MAX)
+        plt.ylim(-X_MAX, X_MAX)
         #plt.title()
 
-    plt.suptitle("OOD $\sigma$ z-score per layer")
+    plt.suptitle("OOD $\\sigma$ z-score per layer")
     plt.tight_layout()
+    plt.subplots_adjust(wspace=0.05, hspace=0.05)
     plt.show()
 
 

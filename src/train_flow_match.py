@@ -18,7 +18,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 FLOW_SIGMA = 0
 
 EPOCHS = 100
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 LR = 2e-4
 
 epoch = 0
@@ -26,30 +26,61 @@ global_step = 0
 
 
 class FlowFetModel(nn.Module):
-    def __init__(self, dx, dy, dh):
-        """
-        dx: Input dim (latent + condition + time).
-        dy: Output dim (latent).
-        dh: Hidden dim.
-        """
+    # Dimensions.
+    dim_latent = 10
+    dim_cond = 4
+    dim_hidden = 256
+
+    # Exponentially increasing freqs for sin embed.
+    embed_dim = 8
+    embed_freq_start = 1
+    embed_freq_mult = 2
+
+    def __init__(self):
         super().__init__()
 
-        self.inp = nn.Linear(dx, dh)
+        dim_in = (self.dim_latent + self.dim_cond + 1) * self.embed_dim
+        self.in_layer = nn.Linear(dim_in, self.dim_hidden)
+
+        # Residual blocks.
         blocks = []
         for _ in range(4):
             blocks.append(nn.Sequential(
-                nn.Linear(dh, dh),
+                nn.Linear(self.dim_hidden, self.dim_hidden),
                 nn.LeakyReLU(),
             ))
         self.blocks = nn.ModuleList(blocks)
-        self.head = nn.Linear(dh, dy)
 
-    def forward(self, x):
-        x = self.inp(x)
+        self.head = nn.Linear(self.dim_hidden, self.dim_latent)
+
+    def forward(self, xt, cond, time):
+        """
+        xt: (B, X) latent vector.
+        cond: (B, Y) condition.
+        time: (B, 1) time in [0, 1].
+        """
+        # Generate sin embeds for all input values.
+        x = torch.cat([xt, cond, time], dim=-1)
+        x = torch.cat([self.sin_embed(x[:, i]) for i in range(x.shape[1])], dim=1)
+
+        x = self.in_layer(x)
         for b in self.blocks:
             x = x + b(x)
         x = self.head(x)
         return x
+
+    def sin_embed(self, x):
+        """Generate exponentially increasing freq sin embed.
+        x: (B,)
+        return: (B, D)
+        """
+        ret = torch.zeros((x.shape[0], self.embed_dim), device=x.device)
+        freq = self.embed_freq_start
+        for i in range(0, self.embed_dim, 2):
+            ret[:, i] = torch.sin(x * freq)
+            ret[:, i + 1] = torch.cos(x * freq)
+            freq *= self.embed_freq_mult
+        return ret
 
 
 def train(flow_matcher, model, optim, train_loader, writer):
@@ -59,9 +90,7 @@ def train(flow_matcher, model, optim, train_loader, writer):
         z0 = torch.randn_like(x)
         # t: [0, 1]. xt: x at time. ut: GT velocity at time.
         t, xt, ut = flow_matcher.sample_location_and_conditional_flow(z0, x)
-
-        inp = torch.cat([xt, y, t.unsqueeze(1)], dim=-1)
-        pred_ut = model(inp)
+        pred_ut = model(xt, y, t.unsqueeze(1))
 
         loss = torch.nn.functional.mse_loss(pred_ut, ut)
         loss.backward()
@@ -79,17 +108,17 @@ def val(flow_matcher, model, val_loader, writer):
         # Sample random time and flow.
         z0 = torch.randn_like(x)
         t, xt, ut = flow_matcher.sample_location_and_conditional_flow(z0, x)
+        pred_ut = model(xt, y, t.unsqueeze(1))
 
-        inp = torch.cat([xt, y, t.unsqueeze(1)], dim=-1)
-        pred_ut = model(inp)
         vel_loss = torch.nn.functional.mse_loss(pred_ut, ut)
         total_vel_loss += vel_loss.item()
 
     # Generate result with ODE solver (using last iter of val_loader).
-    def vel_func(t, x):
-        t = t.repeat(x.shape[0])
-        inp = torch.cat([x, y, t.unsqueeze(1)], dim=-1)
-        return model(inp)
+    def vel_func(t, xt):
+        # Expand t to (B, 1)
+        t = t.repeat(x.shape[0]).unsqueeze(1)
+        # y comes from above for loop.
+        return model(xt, y, t)
 
     ts = torch.linspace(0, 1, 100)
     try:
@@ -118,7 +147,7 @@ def main():
     # Make models.
     flow_matcher = ConditionalFlowMatcher(FLOW_SIGMA)
 
-    model = FlowFetModel(dataset.data.shape[1] + 1, dataset.x_size, 1024).to(DEVICE)
+    model = FlowFetModel().to(DEVICE)
     optim = torch.optim.Adam(model.parameters(), lr=LR)
 
     writer = SummaryWriter(args.log_dir)
