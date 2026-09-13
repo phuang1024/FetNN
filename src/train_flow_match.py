@@ -19,7 +19,7 @@ FLOW_SIGMA = 0
 
 EPOCHS = 100
 BATCH_SIZE = 64
-LR = 2e-4
+LR = 1e-4
 
 epoch = 0
 global_step = 0
@@ -29,10 +29,10 @@ class FlowFetModel(nn.Module):
     # Dimensions.
     dim_latent = 10
     dim_cond = 4
-    dim_hidden = 256
+    dim_hidden = 512
 
     # Exponentially increasing freqs for sin embed.
-    embed_dim = 8
+    embed_dim = 12
     embed_freq_start = 1
     embed_freq_mult = 2
 
@@ -44,7 +44,7 @@ class FlowFetModel(nn.Module):
 
         # Residual blocks.
         blocks = []
-        for _ in range(4):
+        for _ in range(6):
             blocks.append(nn.Sequential(
                 nn.Linear(self.dim_hidden, self.dim_hidden),
                 nn.LeakyReLU(),
