@@ -29,10 +29,10 @@ class FlowFetModel(nn.Module):
     # Dimensions.
     dim_latent = 10
     dim_cond = 4
-    dim_hidden = 512
+    dim_hidden = 256
 
-    # Exponentially increasing freqs for sin embed.
-    embed_dim = 12
+    # Sin embed with exponentially increasing freqs.
+    embed_dim = 16
     embed_freq_start = 1
     embed_freq_mult = 2
 
@@ -44,7 +44,7 @@ class FlowFetModel(nn.Module):
 
         # Residual blocks.
         blocks = []
-        for _ in range(6):
+        for _ in range(8):
             blocks.append(nn.Sequential(
                 nn.Linear(self.dim_hidden, self.dim_hidden),
                 nn.LeakyReLU(),
@@ -150,7 +150,7 @@ def main():
     flow_matcher = ConditionalFlowMatcher(FLOW_SIGMA)
 
     model = FlowFetModel().to(DEVICE)
-    optim = torch.optim.Adam(model.parameters(), lr=LR)
+    optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 75, 0.5)
 
     writer = SummaryWriter(args.log_dir)
@@ -164,7 +164,9 @@ def main():
 
     global epoch
     for epoch in trange(EPOCHS):
+        model.train()
         train(flow_matcher, model, optim, train_loader, writer)
+        model.eval()
         val(flow_matcher, model, val_loader, writer)
         lr_scheduler.step()
 
