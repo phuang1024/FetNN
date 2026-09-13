@@ -17,9 +17,9 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 FLOW_SIGMA = 0
 
-EPOCHS = 100
+EPOCHS = 300
 BATCH_SIZE = 64
-LR = 1e-4
+LR = 1e-3
 
 epoch = 0
 global_step = 0
@@ -98,6 +98,7 @@ def train(flow_matcher, model, optim, train_loader, writer):
         optim.zero_grad()
 
         writer.add_scalar("train/loss", loss.item(), global_step)
+        writer.add_scalar("train/lr", optim.param_groups[0]["lr"], global_step)
         global_step += 1
 
 
@@ -149,6 +150,7 @@ def main():
 
     model = FlowFetModel().to(DEVICE)
     optim = torch.optim.Adam(model.parameters(), lr=LR)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 75, 0.5)
 
     writer = SummaryWriter(args.log_dir)
 
@@ -163,6 +165,7 @@ def main():
     for epoch in trange(EPOCHS):
         train(flow_matcher, model, optim, train_loader, writer)
         val(flow_matcher, model, val_loader, writer)
+        lr_scheduler.step()
 
 
 if __name__ == "__main__":
