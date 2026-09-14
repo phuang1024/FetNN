@@ -19,7 +19,7 @@ FLOW_SIGMA = 0
 
 EPOCHS = 300
 BATCH_SIZE = 64
-LR = 1e-3
+LR = 7e-3
 
 epoch = 0
 global_step = 0
@@ -27,12 +27,12 @@ global_step = 0
 
 class FlowFetModel(nn.Module):
     # Dimensions.
-    dim_latent = 10
+    dim_latent = 11
     dim_cond = 4
-    dim_hidden = 256
+    dim_hidden = 128
 
     # Sin embed with exponentially increasing freqs.
-    embed_dim = 16
+    embed_dim = 8
     embed_freq_start = 1
     embed_freq_mult = 2
 
@@ -44,7 +44,7 @@ class FlowFetModel(nn.Module):
 
         # Residual blocks.
         blocks = []
-        for _ in range(8):
+        for _ in range(6):
             blocks.append(nn.Sequential(
                 nn.Linear(self.dim_hidden, self.dim_hidden),
                 nn.LeakyReLU(),
@@ -151,7 +151,7 @@ def main():
 
     model = FlowFetModel().to(DEVICE)
     optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 75, 0.5)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 75, 0.7)
 
     writer = SummaryWriter(args.log_dir)
 
