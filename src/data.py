@@ -1,4 +1,4 @@
-"""Load data from CSV.
+"""Load and process dataset from CSV.
 Run this file to visualize data.
 """
 
@@ -16,10 +16,8 @@ class MosDataset(Dataset):
     """Dataset base class for MOS data generated with TCAD.
     X is list of scalar recipe params. Y is list of scalar electrical features.
 
-    Usage:
-        Create a subclass and define params below.
-        On init, pass in the CSV data file.
-        For inference, use unnormalize() to convert from logits to recipe.
+    Create a subclass and define params below.
+    For inference, use unnormalize() to convert from logits to recipe.
     """
     x_size: int
     """First N features (in csv) are X."""
@@ -44,6 +42,7 @@ class MosDataset(Dataset):
         with open(path) as fp:
             reader = csv.reader(fp)
             for i, line in enumerate(reader):
+                # First line is labels.
                 if i == 0:
                     self.labels = line
                 else:
@@ -52,24 +51,27 @@ class MosDataset(Dataset):
 
     def preprocess_data(self):
         """Logs and normalizes features.
-        Sets ``self.means`` and ``self.stds``.
+        Also sets ``self.means`` and ``self.stds``.
         """
         self.means = []
         self.stds = []
         for i in range(self.data.shape[1]):
+            # Log this feature.
             if self.log[i]:
                 self.data[:, i] = torch.log1p(self.data[:, i])
 
+            # Compute Z score.
             mean = torch.mean(self.data[:, i]).item()
-            std = torch.std(self.data[:, i]).item()
+            std = torch.std(self.data[:, i]).item() + 1e-3
             self.data[:, i] = (self.data[:, i] - mean) / std
+
             self.means.append(mean)
             self.stds.append(std)
 
         self.data = self.data.to(self.device)
 
     def unnormalize(self, data):
-        """Undo the normalize and log (given logits).
+        """Undo the normalize and log. Convert from logits to original units.
         data: Tensor (B, D).
             If D dimension is smaller than original CSV data,
             data is assumed to be the first D columns.
@@ -100,26 +102,16 @@ class MosDataset(Dataset):
 
 
 class LdmosDegrData(MosDataset):
-    x_size = 10
+    x_size = 11
+    # For new_data_5_filtered.csv
     log = (
         False, False,
         True, True, True,
         False, False, False,
-        False, False,
+        True, False, False,
 
         False, False, True, False
     )
-    """
-    # TODO testing all log.
-    log = (
-        True, True,
-        True, True, True,
-        True, True, True,
-        True, True,
-
-        True, True, True, True
-    )
-    """
 
 
 def split_train_val(dataset, ratio, batch_size):
