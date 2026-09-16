@@ -85,6 +85,11 @@ class FlowFetModel(nn.Module):
             freq *= self.embed_freq_mult
         return ret
 
+    def init_weights(self, init_std=1e-2):
+        for param in self.parameters():
+            if param.requires_grad:
+                param.data = init_std * torch.randn_like(param)
+
 
 def train(flow_matcher, model, optim, train_loader, writer):
     global global_step
@@ -175,6 +180,7 @@ def main():
     flow_matcher = ConditionalFlowMatcher(FLOW_SIGMA)
 
     model = FlowFetModel().to(DEVICE)
+    model.init_weights()
     optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 75, 0.7)
 
