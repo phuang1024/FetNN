@@ -26,6 +26,8 @@ global_step = 0
 
 
 class FlowFetModel(nn.Module):
+    """Residual MLP model that predicts velocity.
+    """
     # Dimensions.
     dim_latent = 11
     dim_cond = 4
@@ -47,7 +49,7 @@ class FlowFetModel(nn.Module):
         for _ in range(6):
             blocks.append(nn.Sequential(
                 nn.Linear(self.dim_hidden, self.dim_hidden),
-                nn.LeakyReLU(),
+                nn.SiLU(),
                 nn.Dropout(0.1),
             ))
         self.blocks = nn.ModuleList(blocks)
@@ -102,6 +104,14 @@ def train(flow_matcher, model, optim, train_loader, writer):
         writer.add_scalar("train/lr", optim.param_groups[0]["lr"], global_step)
         global_step += 1
 
+    # Generate X sample.
+    pred_x = generate_samples(model, z0, y)
+    if pred_x is not None:
+        x_loss = torch.nn.functional.mse_loss(pred_x, x)
+    else:
+        x_loss = None
+    writer.add_scalar("train/x_loss", x_loss, global_step)
+
 
 @torch.no_grad()
 def val(flow_matcher, model, val_loader, writer):
@@ -116,6 +126,22 @@ def val(flow_matcher, model, val_loader, writer):
         total_vel_loss += vel_loss.item()
 
     # Generate result with ODE solver (using last iter of val_loader).
+    pred_x = generate_samples(model, z0, y)
+    if pred_x is not None:
+        x_loss = torch.nn.functional.mse_loss(pred_x, x)
+    else:
+        x_loss = None
+
+    total_vel_loss /= len(val_loader)
+    writer.add_scalar("val/vel_loss", total_vel_loss, global_step)
+    writer.add_scalar("val/x_loss", x_loss, global_step)
+
+
+def generate_samples(model, z0, y):
+    """Generate X samples given z0 (initial) and y (condition).
+    z0: (B, Dz)
+    y: (B, Dy)
+    """
     def vel_func(t, xt):
         # Expand t to (B, 1)
         t = t.repeat(x.shape[0]).unsqueeze(1)
@@ -126,14 +152,10 @@ def val(flow_matcher, model, val_loader, writer):
     try:
         trajectory = odeint(vel_func, z0, ts)
         pred_x = trajectory[-1]
-        x_loss = torch.nn.functional.mse_loss(pred_x, x)
+        return pred_x
     except AssertionError as e:
         print(e)
-        x_loss = None
-
-    total_vel_loss /= len(val_loader)
-    writer.add_scalar("val/vel_loss", total_vel_loss, global_step)
-    writer.add_scalar("val/x_loss", x_loss, global_step)
+        return None
 
 
 def main():
