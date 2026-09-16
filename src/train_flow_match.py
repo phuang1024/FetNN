@@ -88,6 +88,7 @@ class FlowFetModel(nn.Module):
 
 def train(flow_matcher, model, optim, train_loader, writer):
     global global_step
+    model.train()
     for x, y in train_loader:
         # Starting Gaussian distr. Flow goes from z0 to x.
         z0 = torch.randn_like(x)
@@ -105,6 +106,7 @@ def train(flow_matcher, model, optim, train_loader, writer):
         global_step += 1
 
     # Generate X sample.
+    model.eval()
     pred_x = generate_samples(model, z0, y)
     if pred_x is not None:
         x_loss = torch.nn.functional.mse_loss(pred_x, x)
@@ -115,6 +117,7 @@ def train(flow_matcher, model, optim, train_loader, writer):
 
 @torch.no_grad()
 def val(flow_matcher, model, val_loader, writer):
+    model.eval()
     total_vel_loss = 0
     for x, y in val_loader:
         # Sample random time and flow.
@@ -144,7 +147,7 @@ def generate_samples(model, z0, y):
     """
     def vel_func(t, xt):
         # Expand t to (B, 1)
-        t = t.repeat(x.shape[0]).unsqueeze(1)
+        t = t.repeat(xt.shape[0]).unsqueeze(1)
         # y comes from above for loop.
         return model(xt, y, t)
 
@@ -186,9 +189,7 @@ def main():
 
     global epoch
     for epoch in trange(EPOCHS):
-        model.train()
         train(flow_matcher, model, optim, train_loader, writer)
-        model.eval()
         val(flow_matcher, model, val_loader, writer)
         lr_scheduler.step()
 
