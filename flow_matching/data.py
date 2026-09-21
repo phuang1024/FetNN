@@ -92,7 +92,9 @@ class MosDataset(Dataset):
         y = self.data[index, self.x_size:]
         if True:
             x, y = self.augment(x, y)
-        return x, y
+        # TODO test forward mode
+        return y, x
+        #return x, y
 
     def augment(self, x, y):
         # Random noise.
