@@ -6,7 +6,7 @@ from pathlib import Path
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from torchcfm.conditional_flow_matching import ConditionalFlowMatcher
+from torchcfm.conditional_flow_matching import ExactOptimalTransportConditionalFlowMatcher
 from torchdiffeq import odeint
 from tqdm import trange
 
@@ -17,7 +17,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 FLOW_SIGMA = 0
 
-EPOCHS = 300
+EPOCHS = 400
 BATCH_SIZE = 64
 LR = 7e-3
 
@@ -54,8 +54,8 @@ def generate_samples(model, z0, y):
         # Use external y value.
         return model(xt, y, t)
 
-    ts = torch.linspace(0, 1, 100)
-    trajectory = odeint(vel_func, z0, ts)
+    t_span = torch.tensor([0, 1], dtype=z0.dtype, device=z0.device)
+    trajectory = odeint(vel_func, z0, t_span, method="dopri5")
     pred_x = trajectory[-1]
     return pred_x
 
@@ -116,13 +116,13 @@ def main():
     train_loader, val_loader = split_train_val(dataset, 0.8, BATCH_SIZE)
 
     # Make models.
-    flow_matcher = ConditionalFlowMatcher(FLOW_SIGMA)
+    flow_matcher = ExactOptimalTransportConditionalFlowMatcher(FLOW_SIGMA)
 
     model = FlowFetModel().to(DEVICE)
     model.init_weights()
 
     optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 75, 0.7)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 100, 0.7)
 
     writer = SummaryWriter(args.log_dir)
 
