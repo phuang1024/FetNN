@@ -44,12 +44,59 @@ def design_criterion(y):
     return vth_score + fom_score * 0.1
 
 
+def plot_data(data):
+    plt.figure()
+
+    plt.subplot(1, 2, 1)
+    # Lsti vs Tox
+    plt.scatter(data[:, 0], data[:, 1])
+    plt.xlim(-2, 2)
+    plt.ylim(-3, 2)
+    plt.xlabel("Lsti")
+    plt.ylabel("Tox")
+
+    # Plot wall.
+    plt.twinx()
+    xs = np.linspace(-1.75, 1.75, 100)
+    ys = -np.log(xs + 1.75) - np.log(-xs + 1.75)
+    plt.plot(xs, ys, color="orange", label="WALL(Lsti)")
+    plt.ylim(-2, 20)
+    
+    plt.title("Loss fn for feasibility")
+    plt.legend()
+
+
+    plt.subplot(1, 2, 2)
+    # BV vs Rsp
+    plt.scatter(data[:, -3], data[:, -4])
+    plt.xlim(-4, 4)
+    plt.ylim(-1, 2)
+    plt.xlabel("BV")
+    plt.ylabel("Rsp")
+
+    # Plot wall.
+    plt.twinx()
+    xs = np.linspace(-4, 4, 100)
+    ys = -np.log(xs)
+    plt.plot(xs, ys, color="orange", label="WALL(BV)")
+    plt.ylim(-2, 20)
+    
+    plt.title("Loss fn for design constraint")
+    plt.legend()
+
+
+    plt.tight_layout()
+    plt.show()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("data")
     args = parser.parse_args()
 
     data, _, _ = load_data(args.data)
+    plot_data(data)
+    stop
 
     data = data[:, -4:]
     designer = Designer(data, design_criterion)
