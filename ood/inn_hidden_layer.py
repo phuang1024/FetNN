@@ -88,6 +88,16 @@ def rms_mean(data, dim=None):
     return torch.sqrt(torch.mean(data ** 2, dim=dim))
 
 
+def main_plot_data():
+    """Plot datasets."""
+    plt.figure()
+    plt.scatter(y_train[:, 1], y_train[:, 0])
+    plt.xlabel("BV")
+    plt.ylabel("Rsp")
+    plt.title("Rsp vs BV for y_train")
+    plt.show()
+
+
 def main_z_score():
     """Print average z scores."""
     def print_score(y_test, name):
@@ -160,5 +170,6 @@ def main_2d_sweep():
 
 if __name__ == "__main__":
     torch.set_grad_enabled(False)
+    main_plot_data()
     #main_z_score()
-    main_2d_sweep()
+    #main_2d_sweep()

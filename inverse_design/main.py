@@ -30,6 +30,8 @@ def plot_design(data, trajectory, scores):
     rsps = data[:, 0]
     plt.figure()
     plt.scatter(bvs, rsps, c="pink", alpha=0.5)
+    plt.xlabel("BV")
+    plt.ylabel("Rsp")
 
     plt.plot(trajectory[:, 1], trajectory[:, 0])
     plt.show()
@@ -95,8 +97,8 @@ def main():
     args = parser.parse_args()
 
     data, _, _ = load_data(args.data)
-    plot_data(data)
-    stop
+    #plot_data(data)
+    #stop
 
     data = data[:, -4:]
     designer = Designer(data, design_criterion)
