@@ -8,8 +8,8 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import trange
 
-from data import LdmosDegrData, split_train_val
-from model import FetModel
+from dnn_model import FetDNNModel
+from fet_data import FetDataset, split_train_val
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -63,11 +63,11 @@ def main():
     args = parser.parse_args()
 
     # Make datasets.
-    dataset = LdmosDegrData(args.data, DEVICE)
+    dataset = FetDataset(args.data, DEVICE)
     train_loader, val_loader = split_train_val(dataset, 0.8, BATCH_SIZE)
 
     # Make model.
-    model = FetModel(11, 4).to(DEVICE)
+    model = FetDNNModel(11, 4).to(DEVICE)
     model.init_weights()
 
     optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)

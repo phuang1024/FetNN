@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 
-class FetModel(nn.Module):
+class FetDNNModel(nn.Module):
     dim_hidden = 128
 
     def __init__(self, dim_in, dim_out):
@@ -23,8 +23,3 @@ class FetModel(nn.Module):
 
     def forward(self, x):
         return self.mlp(x)
-
-    def init_weights(self, init_std=1e-2):
-        for param in self.parameters():
-            if param.requires_grad:
-                param.data = init_std * torch.randn_like(param)
