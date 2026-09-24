@@ -62,14 +62,15 @@ class FetDataset(Dataset):
     def __getitem__(self, index):
         x = self.data[index, :self.x_size]
         y = self.data[index, self.x_size:]
-        #x, y = self.augment(x, y)
+        #x, y = self.augment_data(x, y)
         return x, y
 
-    def augment(self, x, y):
-        # Random noise.
-        x = x + torch.randn_like(x) * DATA_NOISE
-        y = y + torch.randn_like(y) * DATA_NOISE
-        return x, y
+
+def augment_data(x, y):
+    # Random noise.
+    x = x + torch.randn_like(x) * DATA_NOISE
+    y = y + torch.randn_like(y) * DATA_NOISE
+    return x, y
 
 
 def load_data(path):

@@ -8,7 +8,7 @@ import torch.nn as nn
 class FetDNNModel(nn.Module):
     dim_hidden = 128
 
-    def __init__(self, dim_in, dim_out):
+    def __init__(self, dim_in=11, dim_out=4):
         super().__init__()
 
         self.mlp = nn.Sequential(

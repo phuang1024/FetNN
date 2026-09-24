@@ -56,6 +56,17 @@ def val(model, val_loader, writer):
     # TODO generate samples
 
 
+def make_model(init_std=1e-2):
+    """Make model and init weights.
+    """
+    model = FetDNNModel().to(DEVICE)
+    for param in model.parameters():
+        if param.requires_grad:
+            param.data = init_std * torch.randn_like(param)
+
+    return model
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("data")
@@ -67,9 +78,7 @@ def main():
     train_loader, val_loader = split_train_val(dataset, 0.8, BATCH_SIZE)
 
     # Make model.
-    model = FetDNNModel(11, 4).to(DEVICE)
-    model.init_weights()
-
+    model = make_model()
     optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 100, 0.7)
 
