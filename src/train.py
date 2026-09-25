@@ -8,7 +8,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import trange
 
-from dnn_model import FetDNNModel
+from model import FetDNNModel
 from fet_data import FetDataset, split_train_val
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
