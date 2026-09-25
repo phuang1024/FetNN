@@ -13,11 +13,11 @@ class FetDNNModel(nn.Module):
 
         self.mlp = nn.Sequential(
             nn.Linear(dim_in, self.dim_hidden),
-            nn.SiLU(),
+            nn.LeakyReLU(),
             nn.Linear(self.dim_hidden, self.dim_hidden),
-            nn.SiLU(),
+            nn.LeakyReLU(),
             nn.Linear(self.dim_hidden, self.dim_hidden),
-            nn.SiLU(),
+            nn.LeakyReLU(),
             nn.Linear(self.dim_hidden, dim_out),
         )
 
