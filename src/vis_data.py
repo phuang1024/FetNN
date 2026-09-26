@@ -1,3 +1,6 @@
+"""Plot and visualize dataset.
+"""
+
 import matplotlib.pyplot as plt
 
 from fet_data import FetDataset

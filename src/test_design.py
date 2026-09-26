@@ -1,43 +1,16 @@
+"""Test inverse design via GD.
+Plot results.
+"""
+
 import argparse
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from model import FetDNNModel
 from fet_data import FetDataset
-
-
-def inverse_gd_design(criterion, model, steps=1000):
-    x = torch.zeros([11], requires_grad=True)
-    optim = torch.optim.Adam([x], lr=1e-2)
-
-    traj_x = torch.zeros([steps, 11])
-    traj_y = torch.zeros([steps, 4])
-    losses = torch.zeros([steps])
-    for i in range(steps):
-        pred_y = model(x.unsqueeze(0)).squeeze(0)
-        loss = criterion(x, pred_y)
-        loss.backward()
-        optim.step()
-        optim.zero_grad()
-
-        traj_x[i] = x
-        traj_y[i] = pred_y
-        losses[i] = loss
-
-    return traj_x, traj_y, losses
-
-
-def make_criterion():
-    #y_target = torch.tensor((-0.25, 0, 0, 0))
-
-    def criterion(x, y):
-        #return torch.linalg.norm(y - y_target)
-        wall_x = torch.mean(-torch.log(x + 1) - torch.log(-x + 1))
-        fom = -y[0]
-        return -fom + wall_x
-    return criterion
+from inverse_gd import InverseGD
+from model import FetDNNModel
 
 
 def plot_results(dataset, traj_x, traj_y, losses):
@@ -94,8 +67,8 @@ def main():
     model = FetDNNModel()
     model.load_state_dict(torch.load(args.model))
 
-    criterion = make_criterion()
-    traj_x, traj_y, losses = inverse_gd_design(criterion, model)
+    designer = InverseGD(dataset, model)
+    traj_x, traj_y, losses = designer.run_inverse_design(1000)
     plot_results(dataset, traj_x, traj_y, losses)
 
 

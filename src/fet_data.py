@@ -43,8 +43,8 @@ class FetDataset(Dataset):
         """
         self.device = device
 
-        self.raw_data, self.labels = self.load_data(path)
-        self.data, self.means, self.stds = self.preprocess_data()
+        self.load_data(path)
+        self.preprocess_data()
 
     def load_data(self, path):
         """Load raw data from CSV.

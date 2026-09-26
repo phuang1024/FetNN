@@ -1,4 +1,4 @@
-"""Train flow matching.
+"""Train DNN.
 """
 
 import argparse
