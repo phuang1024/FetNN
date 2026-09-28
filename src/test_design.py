@@ -9,58 +9,15 @@ import numpy as np
 import torch
 
 from fet_data import FetDataset
-from inverse_gd import InverseGD
+from inverse_gd import InverseGD, plot_trajectory
 from model import FetDNNModel
-
-
-def plot_results(dataset, traj_x, traj_y, losses):
-    traj_x = traj_x.detach().numpy()
-    traj_y = traj_y.detach().numpy()
-    losses = losses.detach().numpy()
-
-    # Loss.
-    plt.figure()
-    plt.plot(losses)
-    plt.xlabel("Step")
-    plt.ylabel("Loss")
-
-    # Step size.
-    step_sizes = []
-    for i in range(len(traj_x) - 1):
-        size = np.linalg.norm(traj_x[i + 1] - traj_x[i])
-        step_sizes.append(size)
-
-    plt.figure()
-    plt.plot(step_sizes)
-    plt.xlabel("Step")
-    plt.ylabel("X step magnitude")
-
-    # BV-Rsp trajectory.
-    plt.figure()
-    plt.scatter(dataset.data[:, -3], dataset.data[:, -4], color="pink", alpha=0.4)
-    plt.plot(traj_y[:, -3], traj_y[:, -4])
-
-    plt.xlabel("BV")
-    plt.ylabel("Rsp")
-    plt.xlim(-1, 1)
-    plt.ylim(-1, 1)
-
-    # Some trajectories in X.
-    plt.figure()
-    plt.plot(traj_x[:, 0], label="Lsti")
-
-    plt.legend()
-    plt.xlabel("Step")
-    plt.ylabel("Value")
-
-    plt.show()
 
 
 def wall_x(dataset):
     maxes, _ = torch.max(dataset.data, dim=0)
     mins, _ = torch.min(dataset.data, dim=0)
 
-    def criterion(x, y):
+    def criterion(x, y, raw_x, raw_y):
         loss = 0
         for i in range(len(x)):
             loss -= torch.log(x[i] - mins[i])
@@ -69,8 +26,8 @@ def wall_x(dataset):
     return criterion
 
 
-def fom_crit(x, y):
-    return y[0] - y[1]
+def fom_crit(x, y, raw_x, raw_y):
+    return y[0]
 
 
 def main():
@@ -89,7 +46,8 @@ def main():
     designer.add_criterion(fom_crit, 1)
 
     traj_x, traj_y, losses = designer.run_inverse_design(1000)
-    plot_results(dataset, traj_x, traj_y, losses)
+    #plot_results(dataset, traj_x, traj_y, losses)
+    plot_trajectory(dataset, traj_x, traj_y, losses, -3, -4, "BV", "Rsp")
 
 
 if __name__ == "__main__":
