@@ -8,22 +8,34 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader, random_split
 
+X_DIM = 10
+Y_DIM = 4
+"""Number of X, Y features in dataset."""
+
+# For new_data_4.csv
+LOG_FEATURE = (
+    False, False,
+    True, True, True,
+    False, False, False,
+    True, False,
+
+    False, False, True, False,
+)
+"""
+# For new_data_5_filtered.csv
+LOG_FEATURE = (
+    False, False,
+    True, True, True,
+    False, False, False,
+    True, False, False,
+
+    False, False, True, False,
+)
+"""
+"""Whether to log each feature."""
+
 
 class FetDataset(Dataset):
-    x_dim = 11
-    """First N features (in csv) are X."""
-
-    # For new_data_5_filtered.csv
-    log = (
-        False, False,
-        True, True, True,
-        False, False, False,
-        True, False, False,
-
-        False, False, True, False
-    )
-    """Whether to log each feature."""
-
     raw_data: torch.Tensor
     """(N, D) raw data."""
     data: torch.Tensor
@@ -67,7 +79,7 @@ class FetDataset(Dataset):
         self.stds = []
         for i in range(self.raw_data.shape[1]):
             # Log this feature.
-            if self.log[i]:
+            if LOG_FEATURE[i]:
                 self.data[:, i] = torch.log1p(self.raw_data[:, i])
 
             # Z score normalization.
@@ -86,7 +98,7 @@ class FetDataset(Dataset):
         """
         for i in range(data.shape[1]):
             data[:, i] = data[:, i] * self.stds[i] + self.means[i]
-            if self.log[i]:
+            if LOG_FEATURE[i]:
                 data[:, i] = torch.expm1(data[:, i])
         return data
 
@@ -94,13 +106,13 @@ class FetDataset(Dataset):
         return self.data.shape[0]
 
     def __getitem__(self, index):
-        x = self.data[index, :self.x_dim]
-        y = self.data[index, self.x_dim:]
-        #x, y = augment_data(x, y)
+        x = self.data[index, :X_DIM]
+        y = self.data[index, X_DIM:]
+        x, y = augment_data(x, y)
         return x, y
 
 
-def augment_data(x, y, noise=1e-4):
+def augment_data(x, y, noise=1e-2):
     # Random noise.
     x = x + torch.randn_like(x) * noise
     y = y + torch.randn_like(y) * noise

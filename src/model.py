@@ -4,21 +4,24 @@
 import torch
 import torch.nn as nn
 
+from fet_data import X_DIM, Y_DIM
+
 
 class FetDNNModel(nn.Module):
-    dim_hidden = 128
+    # TODO tune this.
+    dim_hidden = 32
 
-    def __init__(self, dim_in=11, dim_out=4):
+    def __init__(self):
         super().__init__()
 
         self.mlp = nn.Sequential(
-            nn.Linear(dim_in, self.dim_hidden),
+            nn.Linear(X_DIM, self.dim_hidden),
             nn.LeakyReLU(),
             nn.Linear(self.dim_hidden, self.dim_hidden),
             nn.LeakyReLU(),
             nn.Linear(self.dim_hidden, self.dim_hidden),
             nn.LeakyReLU(),
-            nn.Linear(self.dim_hidden, dim_out),
+            nn.Linear(self.dim_hidden, Y_DIM),
         )
 
     def forward(self, x):

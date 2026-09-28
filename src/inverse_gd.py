@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from fet_data import FetDataset
+from fet_data import *
 from model import FetDNNModel
 
 
@@ -54,11 +54,11 @@ class InverseGD:
         """
         """
         # TODO starting point customization
-        x = torch.zeros([11], requires_grad=True)
+        x = torch.zeros([X_DIM], requires_grad=True)
         optim = torch.optim.Adam([x], lr=1e-2)
 
-        traj_x = torch.zeros([steps, 11])
-        traj_y = torch.zeros([steps, 4])
+        traj_x = torch.zeros([steps, X_DIM])
+        traj_y = torch.zeros([steps, Y_DIM])
         losses = torch.zeros([steps])
         for i in range(steps):
             pred_y = self.model(x.unsqueeze(0)).squeeze(0)

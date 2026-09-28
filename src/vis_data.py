@@ -3,7 +3,7 @@
 
 import matplotlib.pyplot as plt
 
-from fet_data import FetDataset
+from fet_data import FetDataset, LOG_FEATURE
 
 
 def plot_feature_dists(dataset: FetDataset):
@@ -15,7 +15,7 @@ def plot_feature_dists(dataset: FetDataset):
     for i in range(dataset.data.shape[1]):
         plt.subplot(5, 3, i + 1)
         plt.hist(dataset.data[:, i], bins=50)
-        plt.title(f"{dataset.labels[i]}: log={dataset.log[i]}, mean={dataset.means[i]:.3f}, std={dataset.stds[i]:.3f}")
+        plt.title(f"{dataset.labels[i]}: log={LOG_FEATURE[i]}, mean={dataset.means[i]:.3f}, std={dataset.stds[i]:.3f}")
 
     plt.tight_layout()
     plt.show()
@@ -46,5 +46,5 @@ if __name__ == "__main__":
     print("  x:", x.shape, x.dtype, x)
     print("  y:", y.shape, y.dtype, y)
 
-    #plot_feature_dists(dataset)
-    plot_bv_rsp(dataset)
+    plot_feature_dists(dataset)
+    #plot_bv_rsp(dataset)

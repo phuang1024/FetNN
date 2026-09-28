@@ -17,11 +17,15 @@ def wall_x(dataset):
     maxes, _ = torch.max(dataset.data, dim=0)
     mins, _ = torch.min(dataset.data, dim=0)
 
+    # TODO hack to skip degenerate features.
+    skip = (maxes - mins) < 1e-3
+
     def criterion(x, y, raw_x, raw_y):
         loss = 0
         for i in range(len(x)):
-            loss -= torch.log(x[i] - mins[i])
-            loss -= torch.log(maxes[i] - x[i])
+            if not skip[i]:
+                loss -= torch.log(x[i] - mins[i])
+                loss -= torch.log(maxes[i] - x[i])
         return loss
     return criterion
 
@@ -46,7 +50,6 @@ def main():
     designer.add_criterion(fom_crit, 1)
 
     traj_x, traj_y, losses = designer.run_inverse_design(1000)
-    #plot_results(dataset, traj_x, traj_y, losses)
     plot_trajectory(dataset, traj_x, traj_y, losses, -3, -4, "BV", "Rsp")
 
 

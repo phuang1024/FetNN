@@ -13,7 +13,8 @@ from fet_data import FetDataset, split_train_val
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-EPOCHS = 500
+# TODO tune this.
+EPOCHS = 1000
 BATCH_SIZE = 64
 LR = 1e-3
 
@@ -80,7 +81,7 @@ def main():
     # Make model.
     model = make_model()
     optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 100, 0.7)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 200, 0.7)
 
     writer = SummaryWriter(args.log_dir)
 
