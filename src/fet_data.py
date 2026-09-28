@@ -30,13 +30,9 @@ class FetDataset(Dataset):
     """(N, D) data after normalization and log."""
     labels: list[str]
 
-    # Per feature stats.
     means: list[float]
     stds: list[float]
     """Mean and std after logging."""
-    mins: list[float]
-    maxes: list[float]
-    """Min and max after logging and Z score norm."""
 
     def __init__(self, path, device):
         """Init from CSV file.
@@ -69,8 +65,6 @@ class FetDataset(Dataset):
 
         self.means = []
         self.stds = []
-        self.mins = []
-        self.maxes = []
         for i in range(self.raw_data.shape[1]):
             # Log this feature.
             if self.log[i]:
@@ -83,10 +77,6 @@ class FetDataset(Dataset):
 
             self.means.append(mean)
             self.stds.append(std)
-
-            # Min and max stats.
-            self.mins.append(torch.min(self.data[:, i]).item())
-            self.maxes.append(torch.max(self.data[:, i]).item())
 
     def unnormalize(self, data):
         """Undo the normalize and log. Convert from logits to original units.

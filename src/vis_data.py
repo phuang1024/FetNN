@@ -25,7 +25,7 @@ def plot_bv_rsp(dataset):
     """Plot BV-Rsp 2D scatter.
     """
     plt.figure()
-    plt.scatter(dataset.orig_data[:, -3], dataset.orig_data[:, -4])
+    plt.scatter(dataset.raw_data[:, -3], dataset.raw_data[:, -4])
 
     plt.xlabel("BV (V)")
     plt.ylabel("Rsp (Ohm)")

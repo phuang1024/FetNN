@@ -14,14 +14,10 @@ from model import FetDNNModel
 class InverseGD:
     """Inverse design implementation.
 
-    Criteria:
-        Each criterion is a function (x, y) -> loss.
-            x, y is raw values of recipe and electrical performance.
-            loss will be minimized.
-        Final loss is weighted sum of all criteria.
-
-    Can manually add criterion.
-    Also can call utils for commonly used criteria. E.g. wall function.
+    Each criterion is a function (x, y) -> loss.
+        x, y is raw values of recipe and electrical performance.
+        loss will be minimized.
+    Final loss is weighted sum of all criteria.
     """
 
     def __init__(self, dataset, model):
@@ -30,6 +26,10 @@ class InverseGD:
 
         self.criteria = []
         self.criteria_weights = []
+
+    def add_criterion(self, criterion, weight):
+        self.criteria.append(criterion)
+        self.criteria_weights.append(weight)
 
     def total_loss(self, x, y):
         """Compute weighted sum of criteria.

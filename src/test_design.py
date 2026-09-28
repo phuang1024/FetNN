@@ -56,6 +56,23 @@ def plot_results(dataset, traj_x, traj_y, losses):
     plt.show()
 
 
+def wall_x(dataset):
+    maxes, _ = torch.max(dataset.data, dim=0)
+    mins, _ = torch.min(dataset.data, dim=0)
+
+    def criterion(x, y):
+        loss = 0
+        for i in range(len(x)):
+            loss -= torch.log(x[i] - mins[i])
+            loss -= torch.log(maxes[i] - x[i])
+        return loss
+    return criterion
+
+
+def fom_crit(x, y):
+    return y[0] - y[1]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("data")
@@ -68,6 +85,9 @@ def main():
     model.load_state_dict(torch.load(args.model))
 
     designer = InverseGD(dataset, model)
+    designer.add_criterion(wall_x(dataset), 1e-2)
+    designer.add_criterion(fom_crit, 1)
+
     traj_x, traj_y, losses = designer.run_inverse_design(1000)
     plot_results(dataset, traj_x, traj_y, losses)
 
