@@ -8,10 +8,11 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader, random_split
 
-X_DIM = 10
+X_DIM = 11
 Y_DIM = 4
 """Number of X, Y features in dataset."""
 
+"""
 # For new_data_4.csv
 LOG_FEATURE = (
     False, False,
@@ -31,7 +32,6 @@ LOG_FEATURE = (
 
     False, False, True, False,
 )
-"""
 """Whether to log each feature."""
 
 

@@ -46,5 +46,5 @@ if __name__ == "__main__":
     print("  x:", x.shape, x.dtype, x)
     print("  y:", y.shape, y.dtype, y)
 
-    plot_feature_dists(dataset)
-    #plot_bv_rsp(dataset)
+    #plot_feature_dists(dataset)
+    plot_bv_rsp(dataset)
