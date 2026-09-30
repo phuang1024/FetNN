@@ -50,12 +50,12 @@ class InverseGD:
             loss += criterion(x, y, raw_x, raw_y) * weight
         return loss
 
-    def run_inverse_design(self, steps):
+    def run_inverse_design(self, steps, lr=5e-3):
         """
         """
         # TODO starting point customization
         x = torch.zeros([X_DIM], requires_grad=True)
-        optim = torch.optim.Adam([x], lr=1e-2)
+        optim = torch.optim.Adam([x], lr=lr)
 
         traj_x = torch.zeros([steps, X_DIM])
         traj_y = torch.zeros([steps, Y_DIM])

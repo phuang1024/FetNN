@@ -13,23 +13,20 @@ from inverse_gd import InverseGD
 from model import FetDNNModel
 
 
-def plot_2d_trajs(dataset, trajectories, labels):
+def plot_2d_trajs(dataset, results, labels):
     """Plot BV-Rsp trajectories.
     Scatter plot BV Rsp dataset.
 
-    trajs: (T, N, 2)
-        Multiple GD runs (T),
-        spanning N steps,
-        (BV, Rsp) columns.
+    results: List of (traj_x, traj_y, losses)
     """
     # 2D scatter of chosen features in dataset and trajectory.
     plt.figure()
     plt.scatter(dataset.data[:, -3], dataset.data[:, -4], color="pink", alpha=0.6)
 
     # Plot each traj.
-    for i in range(len(trajectories)):
-        traj = trajectories[i].detach().cpu().numpy()
-        plt.plot(traj[:, 0], traj[:, 1], label=labels[i])
+    for i in range(len(results)):
+        traj_y = results[i][1].detach().cpu().numpy()
+        plt.plot(traj_y[:, -3], traj_y[:, -4], label=labels[i])
 
     plt.xlabel("BV")
     plt.ylabel("Rsp")
@@ -67,25 +64,26 @@ def plot_losses(traj_x, losses):
 
 
 def wall_x(dataset):
+    """Create X barrier criterion based on dataset extrema.
+    """
     maxes, _ = torch.max(dataset.data, dim=0)
     mins, _ = torch.min(dataset.data, dim=0)
-
-    # TODO hack to skip degenerate features.
-    #skip = (maxes - mins) < 1e-3
 
     def criterion(x, y, raw_x, raw_y):
         loss = 0
         for i in range(len(x)):
-            #if not skip[i]:
-                loss -= torch.log(x[i] - mins[i])
-                loss -= torch.log(maxes[i] - x[i])
+            loss -= torch.log(x[i] - mins[i])
+            loss -= torch.log(maxes[i] - x[i])
         return loss
     return criterion
 
 
-def fom_crit(x, y, raw_x, raw_y):
+def min_rsp(x, y, raw_x, raw_y):
     return y[0]
-    #return -1 * max(raw_y[-3], 0) / max(raw_y[-4], 0)
+
+
+def bv_floor(x, y, raw_x, raw_y):
+    return -torch.log(y[1] - -0.4)
 
 
 def test_wall_weights(dataset, model):
@@ -97,17 +95,29 @@ def test_wall_weights(dataset, model):
     for weight in weights:
         designer = InverseGD(dataset, model)
         designer.add_criterion(wall_x(dataset), weight)
-        designer.add_criterion(fom_crit, 1)
+        designer.add_criterion(min_rsp, 1)
 
         traj_x, traj_y, losses = designer.run_inverse_design(1000)
         results.append((traj_x, traj_y, losses))
 
-    # Prepare data for plotting.
-    plot_trajs = []
-    for _, traj_y, _ in results:
-        plot_trajs.append(traj_y[:, (-3, -4)])
+    plot_2d_trajs(dataset, results, weights)
 
-    plot_2d_trajs(dataset, plot_trajs, weights)
+
+def test_bv_floor(dataset, model):
+    """Test BV barrier.
+    """
+    results = []
+    # No BV.
+    designer = InverseGD(dataset, model)
+    designer.add_criterion(wall_x(dataset), 2e-2)
+    designer.add_criterion(min_rsp, 1)
+    results.append(designer.run_inverse_design(1000))
+
+    # Yes BV.
+    designer.add_criterion(bv_floor, 1e-3)
+    results.append(designer.run_inverse_design(1000))
+
+    plot_2d_trajs(dataset, results, ("No BV constraint", "BV > -0.4"))
 
 
 def main():
@@ -121,7 +131,8 @@ def main():
     model = FetDNNModel()
     model.load_state_dict(torch.load(args.model))
 
-    test_wall_weights(dataset, model)
+    #test_wall_weights(dataset, model)
+    test_bv_floor(dataset, model)
 
 
 if __name__ == "__main__":
