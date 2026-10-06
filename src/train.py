@@ -16,24 +16,20 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # TODO tune this.
 EPOCHS = 1000
 BATCH_SIZE = 64
-LR = 1e-3
+LR = 1e-2
 
 epoch = 0
 global_step = 0
 
 
-def forward_dataset(model, loader):
-    for x, y in loader:
-        pred = model(x)
-        loss = torch.nn.functional.mse_loss(pred, y)
-        yield loss
-
-
-def train(model, optim, train_loader, writer):
+def train(dataset, model, optim, train_loader, writer):
     global global_step
     model.train()
 
-    for loss in forward_dataset(model, train_loader):
+    for x, y in train_loader:
+        pred = model(x)
+
+        loss = torch.nn.functional.mse_loss(pred, y)
         loss.backward()
         optim.step()
         optim.zero_grad()
@@ -44,15 +40,28 @@ def train(model, optim, train_loader, writer):
 
 
 @torch.no_grad()
-def val(model, val_loader, writer):
+def val(dataset, model, val_loader, writer):
     model.eval()
 
-    total_loss = 0
-    for loss in forward_dataset(model, val_loader):
-        total_loss += loss.item()
+    total_mse = 0
+    total_mre = 0
+    for x, y in val_loader:
+        pred = model(x)
 
-    total_loss /= len(val_loader)
-    writer.add_scalar("val/loss", total_loss, global_step)
+        # MSE loss.
+        loss = torch.nn.functional.mse_loss(pred, y)
+        total_mse += loss.item()
+
+        # MRE of unnormalized values.
+        y_unnorm = dataset.unnormalize(y, (-4, -3, -2, -1))
+        pred_unnorm = dataset.unnormalize(pred, (-4, -3, -2, -1))
+        mre = torch.abs(pred_unnorm - y_unnorm) / y_unnorm
+        total_mre += torch.mean(mre)
+
+    total_mse /= len(val_loader)
+    total_mre /= len(val_loader)
+    writer.add_scalar("val/mse", total_mse, global_step)
+    writer.add_scalar("val/mre", total_mre, global_step)
 
     # TODO generate samples
 
@@ -91,8 +100,8 @@ def main():
 
     global epoch
     for epoch in trange(EPOCHS):
-        train(model, optim, train_loader, writer)
-        val(model, val_loader, writer)
+        train(dataset, model, optim, train_loader, writer)
+        val(dataset, model, val_loader, writer)
         lr_scheduler.step()
 
     torch.save(model.state_dict(), args.log_dir / f"model_e{epoch}.pt")
