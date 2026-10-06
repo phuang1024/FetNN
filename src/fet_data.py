@@ -90,15 +90,20 @@ class FetDataset(Dataset):
             self.means.append(mean)
             self.stds.append(std)
 
-    def unnormalize(self, data):
-        """Undo the normalize and log. Convert from logits to original units.
-        data: Tensor (B, D).
-            If D dimension is smaller than original CSV data,
-            data is assumed to be the first D columns.
+    def unnormalize(self, data, col_indices=None):
+        """Undo the normalize and log. In place.
+        Convert from logits to original units.
+        
+        data: (B, D) tensor of logits.
+        col_indices: None or (B,).
+            If None, data is assumed to be the first D columns.
+            Else, use given column indices.
         """
         for i in range(data.shape[1]):
-            data[:, i] = data[:, i] * self.stds[i] + self.means[i]
-            if LOG_FEATURE[i]:
+            # Index i in data, but col in mean etc..
+            col = i if col_indices is None else col_indices[i]
+            data[:, i] = data[:, i] * self.stds[col] + self.means[col]
+            if LOG_FEATURE[col]:
                 data[:, i] = torch.expm1(data[:, i])
         return data
 

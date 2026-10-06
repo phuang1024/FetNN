@@ -63,6 +63,18 @@ def plot_losses(traj_x, losses):
     plt.show()
 
 
+def write_recipes(recipes, file):
+    """Write generated recipes to CSV file.
+    """
+    with open(file, "w") as fp:
+        fp.write("Lsti,tox,nwellD1,nwellD2,nwellD3,dose_energy1,dose_energy2,dose_energy3,aneal_temp,Lextra,high_k,Rsp,BV,Rout,vth\n")
+        for x in recipes:
+            x = x[:11].detach().cpu().tolist()
+            x = map(str, x)
+            fp.write(",".join(x))
+            fp.write("\n")
+
+
 def wall_x(dataset):
     """Create X barrier criterion based on dataset extrema.
     """
@@ -118,6 +130,7 @@ def test_bv_floor(dataset, model):
     results.append(designer.run_inverse_design(1000))
 
     plot_2d_trajs(dataset, results, ("No BV constraint", "BV > -0.4"))
+    return results[1]
 
 
 def main():
@@ -131,8 +144,19 @@ def main():
     model = FetDNNModel()
     model.load_state_dict(torch.load(args.model))
 
+    # Print BV value.
+    bv_value = dataset.unnormalize(torch.tensor([[-0.4]]), [-3])
+    print("BV corr. to logit -0.4:", bv_value)
+
+    # Design.
     #test_wall_weights(dataset, model)
-    test_bv_floor(dataset, model)
+    result = test_bv_floor(dataset, model)
+
+    # Save results.
+    result = torch.cat((result[0][-1], result[1][-1]))
+    result = dataset.unnormalize(result.unsqueeze(0))
+    print(result)
+    write_recipes(result, "nodes.csv")
 
 
 if __name__ == "__main__":
