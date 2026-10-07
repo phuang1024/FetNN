@@ -14,12 +14,20 @@ from fet_data import FetDataset, split_train_val
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # TODO tune this.
-EPOCHS = 1000
+EPOCHS = 3000
 BATCH_SIZE = 64
-LR = 1e-2
+LR = 1e-3
 
 epoch = 0
 global_step = 0
+
+
+@torch.no_grad()
+def augment_data(x, y, noise=1e-1):
+    # Random noise.
+    x = x + torch.randn_like(x) * noise
+    y = y + torch.randn_like(y) * noise
+    return x, y
 
 
 def train(dataset, model, optim, train_loader, writer):
@@ -27,6 +35,7 @@ def train(dataset, model, optim, train_loader, writer):
     model.train()
 
     for x, y in train_loader:
+        x, y = augment_data(x, y)
         pred = model(x)
 
         loss = torch.nn.functional.mse_loss(pred, y)
@@ -66,17 +75,6 @@ def val(dataset, model, val_loader, writer):
     # TODO generate samples
 
 
-def make_model(init_std=1e-2):
-    """Make model and init weights.
-    """
-    model = FetDNNModel().to(DEVICE)
-    for param in model.parameters():
-        if param.requires_grad:
-            param.data = init_std * torch.randn_like(param)
-
-    return model
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("data")
@@ -88,9 +86,9 @@ def main():
     train_loader, val_loader = split_train_val(dataset, 0.8, BATCH_SIZE)
 
     # Make model.
-    model = make_model()
+    model = FetDNNModel().to(DEVICE)
     optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 200, 0.7)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 600, 0.5)
 
     writer = SummaryWriter(args.log_dir)
 

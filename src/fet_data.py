@@ -113,15 +113,7 @@ class FetDataset(Dataset):
     def __getitem__(self, index):
         x = self.data[index, :X_DIM]
         y = self.data[index, X_DIM:]
-        x, y = augment_data(x, y)
         return x, y
-
-
-def augment_data(x, y, noise=1e-2):
-    # Random noise.
-    x = x + torch.randn_like(x) * noise
-    y = y + torch.randn_like(y) * noise
-    return x, y
 
 
 def split_train_val(dataset, ratio, batch_size):

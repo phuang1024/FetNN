@@ -9,7 +9,7 @@ from fet_data import X_DIM, Y_DIM
 
 class FetDNNModel(nn.Module):
     # TODO tune this.
-    dim_hidden = 16
+    dim_hidden = 64
 
     def __init__(self):
         super().__init__()
