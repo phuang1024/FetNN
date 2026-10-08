@@ -9,7 +9,7 @@ from fet_data import X_DIM, Y_DIM
 
 class FetDNNModel(nn.Module):
     # TODO tune this.
-    dim_hidden = 64
+    dim_hidden = 32
 
     def __init__(self):
         super().__init__()
@@ -17,10 +17,13 @@ class FetDNNModel(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(X_DIM, self.dim_hidden),
             nn.LeakyReLU(),
+            nn.Dropout(0.1),
             nn.Linear(self.dim_hidden, self.dim_hidden),
             nn.LeakyReLU(),
+            nn.Dropout(0.1),
             nn.Linear(self.dim_hidden, self.dim_hidden),
             nn.LeakyReLU(),
+            nn.Dropout(0.1),
             nn.Linear(self.dim_hidden, Y_DIM),
         )
 

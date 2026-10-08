@@ -23,7 +23,7 @@ global_step = 0
 
 
 @torch.no_grad()
-def augment_data(x, y, noise=1e-1):
+def augment_data(x, y, noise=1e-3):
     # Random noise.
     x = x + torch.randn_like(x) * noise
     y = y + torch.randn_like(y) * noise
