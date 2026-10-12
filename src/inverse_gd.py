@@ -35,7 +35,6 @@ class InverseGD:
 
     def total_loss(self, x, y):
         """Compute weighted sum of criteria.
-        Unnormalizes x and y.
         x, y: Normalized values.
         """
         # Unnormalize x and y.
@@ -50,7 +49,7 @@ class InverseGD:
             loss += criterion(x, y, raw_x, raw_y) * weight
         return loss
 
-    def run_inverse_design(self, steps, lr=5e-3):
+    def run_inverse_design(self, steps, lr=1e-2):
         """
         """
         # TODO starting point customization

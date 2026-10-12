@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from fet_data import FetDataset
+from fet_data import FetDataset, X_DIM
 from inverse_gd import InverseGD
 from model import FetDNNModel
 
@@ -51,11 +51,8 @@ def plot_2d_trajs(dataset, results, labels):
     plt.show()
 
 
-def plot_losses(traj_x, losses):
-    """
-    Plot losses over time.
-
-    losses: (N,) losses over time.
+def plot_design_losses(traj_x, losses):
+    """Plot losses and step sizes over time.
     """
     # Loss over time.
     plt.figure()
@@ -70,7 +67,7 @@ def plot_losses(traj_x, losses):
 
     plt.twinx()
     plt.plot(step_sizes, color="orange", label="Step size")
-    plt.ylabel("Step size")
+    plt.ylabel("Step size (normalized)")
 
     plt.xlabel("Time")
     plt.legend()
@@ -91,6 +88,42 @@ def write_recipes(recipes, file):
             fp.write("\n")
 
 
+@torch.no_grad()
+def plot_loss_map(dataset, model, designer, points=10000):
+    """Randomly sample X points and compute loss fn at each.
+    Then plot over 2D map of variables of choice.
+    """
+    # Sample and map X values.
+    xs = torch.rand([points, X_DIM])
+    maxes, _ = torch.max(dataset.data, dim=0)
+    mins, _ = torch.min(dataset.data, dim=0)
+    for i in range(X_DIM):
+        xs[:, i] = xs[:, i] * (maxes[i] - mins[i]) + mins[i]
+
+    # Get corr Y from model.
+    ys = model(xs)
+
+    # Get loss values per point.
+    losses = []
+    for i in range(len(xs)):
+        losses.append(designer.total_loss(xs[i], ys[i]))
+
+    xs = xs.cpu().numpy()
+    ys = ys.cpu().numpy()
+    losses = np.array(losses)
+
+    # Scatter over BV-Rsp space.
+    plt.figure()
+    plt.scatter(ys[:, 1], ys[:, 0], c=losses)
+    plt.xlabel("BV")
+    plt.ylabel("Rsp")
+
+    plt.tight_layout()
+    plt.show()
+
+
+# Example constraint funcs.
+
 def wall_x(dataset):
     """Create X barrier criterion based on dataset extrema.
     """
@@ -105,8 +138,6 @@ def wall_x(dataset):
         return loss
     return criterion
 
-
-# Example constraint funcs.
 
 def min_rsp(x, y, raw_x, raw_y):
     return y[0]
@@ -179,7 +210,7 @@ def test_bv_floor(dataset, model):
 def test_target_vth(dataset, model):
     # Print Vth value.
     vth_value = dataset.unnormalize(torch.tensor([[VTH_TARGET]]), [-1])
-    print(f"BV corr. to logit {VTH_TARGET}:", vth_value)
+    print(f"Vth corr. to logit {VTH_TARGET}:", vth_value)
 
     results = []
     # No Vth.
@@ -190,7 +221,7 @@ def test_target_vth(dataset, model):
     results.append(designer.run_inverse_design(1000))
 
     # Yes Vth.
-    designer.add_criterion(target_vth, 1)
+    designer.add_criterion(target_vth, 5)
     results.append(designer.run_inverse_design(1000))
 
     plot_2d_trajs(dataset, results, ("No Vth constraint", f"Vth = "))
@@ -207,9 +238,15 @@ def main():
 
     model = FetDNNModel()
     model.load_state_dict(torch.load(args.model))
+    model.eval()
+
+    designer = InverseGD(dataset, model)
+    designer.add_criterion(wall_x(dataset), 1)
+    plot_loss_map(dataset, model, designer)
+    stop
 
     # Design.
-    impossible_design(dataset, model)
+    #impossible_design(dataset, model)
     #test_wall_weights(dataset, model)
     #result = test_bv_floor(dataset, model)
     #result = test_target_vth(dataset, model)
