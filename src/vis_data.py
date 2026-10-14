@@ -21,14 +21,14 @@ def plot_feature_dists(dataset: FetDataset):
     plt.show()
 
 
-def plot_bv_rsp(dataset):
-    """Plot BV-Rsp 2D scatter.
+def plot_2d(dataset, col1, col2, label1="", label2=""):
+    """Scatter plot 2 features.
     """
     plt.figure()
-    plt.scatter(dataset.raw_data[:, -3], dataset.raw_data[:, -4])
+    plt.scatter(dataset.raw_data[:, col1], dataset.raw_data[:, col2])
 
-    plt.xlabel("BV (V)")
-    plt.ylabel("Rsp (Ohm)")
+    plt.xlabel(label1)
+    plt.ylabel(label2)
     plt.tight_layout()
     plt.show()
 
@@ -47,4 +47,4 @@ if __name__ == "__main__":
     print("  y:", y.shape, y.dtype, y)
 
     #plot_feature_dists(dataset)
-    plot_bv_rsp(dataset)
+    plot_2d(dataset, 1, -4, "tox", "Rsp")

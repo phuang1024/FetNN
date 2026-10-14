@@ -103,20 +103,32 @@ def plot_loss_map(dataset, model, designer, points=10000):
     # Get corr Y from model.
     ys = model(xs)
 
+    # Or, use dataset points.
+    """
+    xs = dataset.data[:, :X_DIM]
+    ys = dataset.data[:, X_DIM:]
+    """
+
     # Get loss values per point.
     losses = []
     for i in range(len(xs)):
-        losses.append(designer.total_loss(xs[i], ys[i]))
+        loss = designer.total_loss(xs[i], ys[i], 0)
+        #print(loss)
+        losses.append(loss)
 
     xs = xs.cpu().numpy()
     ys = ys.cpu().numpy()
     losses = np.array(losses)
+    #print(xs.shape, losses.dtype)
 
     # Scatter over BV-Rsp space.
     plt.figure()
-    plt.scatter(ys[:, 1], ys[:, 0], c=losses)
+    plt.scatter(ys[:, 1], ys[:, 0], c=losses, vmin=-5, vmax=5)
+
     plt.xlabel("BV")
     plt.ylabel("Rsp")
+    plt.title("Recipe negative-log barrier loss across dataset.")
+    plt.colorbar()
 
     plt.tight_layout()
     plt.show()
@@ -130,11 +142,15 @@ def wall_x(dataset):
     maxes, _ = torch.max(dataset.data, dim=0)
     mins, _ = torch.min(dataset.data, dim=0)
 
+    # Column indices to skip.
+    skip = (3, 4, 10,)
+
     def criterion(x, y, raw_x, raw_y):
         loss = 0
         for i in range(len(x)):
-            loss -= torch.log(x[i] - mins[i])
-            loss -= torch.log(maxes[i] - x[i])
+            #if i not in skip:
+                loss -= torch.log(x[i] - mins[i])
+                loss -= torch.log(maxes[i] - x[i])
         return loss
     return criterion
 
@@ -228,6 +244,28 @@ def test_target_vth(dataset, model):
     return results[-1]
 
 
+def test_ipm(dataset, model):
+    """Test interior point method.
+    """
+    def wall_weight(t):
+        exponent = np.interp(t, [0, 1], [-1, -2])
+        return 10 ** exponent
+
+    bv_value = dataset.unnormalize(torch.tensor([[BV_FLOOR]]), [-3])
+    print(f"BV corr. to logit {BV_FLOOR}:", bv_value)
+
+    designer = InverseGD(dataset, model)
+    designer.add_criterion(wall_x(dataset), wall_weight)
+    designer.add_criterion(min_rsp, 1)
+    designer.add_criterion(bv_floor, 1e-2)
+
+    results = []
+    results.append(designer.run_inverse_design(1000))
+
+    plot_2d_trajs(dataset, results, ("IPM",))
+    return results[-1]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("data")
@@ -242,6 +280,7 @@ def main():
 
     designer = InverseGD(dataset, model)
     designer.add_criterion(wall_x(dataset), 1)
+    #designer.add_criterion(min_rsp, 1)
     plot_loss_map(dataset, model, designer)
     stop
 
@@ -250,6 +289,7 @@ def main():
     #test_wall_weights(dataset, model)
     #result = test_bv_floor(dataset, model)
     #result = test_target_vth(dataset, model)
+    result = test_ipm(dataset, model)
 
     # Save results.
     result = torch.cat((result[0][-1], result[1][-1]))

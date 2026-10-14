@@ -30,12 +30,17 @@ class InverseGD:
         self.criteria_weights = []
 
     def add_criterion(self, criterion, weight):
+        """
+        weight: Either a number or a function (t,) -> weight.
+            t is in [0, 1]. I.e. step / total_steps.
+        """
         self.criteria.append(criterion)
         self.criteria_weights.append(weight)
 
-    def total_loss(self, x, y):
+    def total_loss(self, x, y, t):
         """Compute weighted sum of criteria.
         x, y: Normalized values.
+        t: Progress from 0 to 1.
         """
         # Unnormalize x and y.
         values = torch.cat((x, y))
@@ -46,6 +51,8 @@ class InverseGD:
         # Apply all criteria.
         loss = 0
         for criterion, weight in zip(self.criteria, self.criteria_weights):
+            if callable(weight):
+                weight = weight(t)
             loss += criterion(x, y, raw_x, raw_y) * weight
         return loss
 
@@ -61,7 +68,9 @@ class InverseGD:
         losses = torch.zeros([steps])
         for i in range(steps):
             pred_y = self.model(x.unsqueeze(0)).squeeze(0)
-            loss = self.total_loss(x, pred_y)
+            t = i / (steps - 1)
+            loss = self.total_loss(x, pred_y, t)
+
             loss.backward()
             optim.step()
             optim.zero_grad()
