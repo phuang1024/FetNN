@@ -8,9 +8,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from fet_data import FetDataset, X_DIM
+from dataset import FetDataset, X_DIM
 from inverse_gd import InverseGD
-from model import FetDNNModel
+from dnn_model import FetDNNModel
 
 BV_FLOOR = -0.3
 VTH_TARGET = 0.25

@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from fet_data import *
-from model import FetDNNModel
+from dataset import *
+from dnn_model import FetDNNModel
 
 
 class InverseGD:

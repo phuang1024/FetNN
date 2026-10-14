@@ -1,15 +1,44 @@
-"""Train DNN.
+"""DNN forward surrogate.
+Run this file to train.
 """
 
 import argparse
 from pathlib import Path
 
 import torch
+import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import trange
 
-from model import FetDNNModel
-from fet_data import FetDataset, split_train_val
+from dataset import *
+
+
+class FetDNNModel(nn.Module):
+    """DNN forward surrogate model.
+    (B, X_DIM) -> (B, Y_DIM)
+    """
+    # TODO tune this.
+    dim_hidden = 32
+
+    def __init__(self):
+        super().__init__()
+
+        self.mlp = nn.Sequential(
+            nn.Linear(X_DIM, self.dim_hidden),
+            nn.LeakyReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(self.dim_hidden, self.dim_hidden),
+            nn.LeakyReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(self.dim_hidden, self.dim_hidden),
+            nn.LeakyReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(self.dim_hidden, Y_DIM),
+        )
+
+    def forward(self, x):
+        return self.mlp(x)
+
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
