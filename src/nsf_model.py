@@ -20,7 +20,7 @@ from nflows.nn.nets import ResidualNet
 from dataset import *
 
 # Model the performance space.
-NSF_DIM = X_DIM
+NSF_DIM = X_DIM + Y_DIM
 LAYERS = 6
 HIDDEN_DIM = 128
 
@@ -65,7 +65,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # TODO tune this.
 EPOCHS = 100
 BATCH_SIZE = 64
-LR = 1e-3
+LR = 2e-3
 
 epoch = 0
 global_step = 0
@@ -85,7 +85,8 @@ def train(dataset, model, optim, train_loader, writer):
 
     for x, y in train_loader:
         #x, y = augment_data(x, y)
-        log_p = model.log_prob(x)
+        cat_xy = torch.cat([x, y], dim=1)
+        log_p = model.log_prob(cat_xy)
 
         loss = -torch.mean(log_p)
         loss.backward()
@@ -104,7 +105,8 @@ def val(dataset, model, val_loader, writer):
 
     total_loss = 0
     for x, y in val_loader:
-        log_p = model.log_prob(x)
+        cat_xy = torch.cat([x, y], dim=1)
+        log_p = model.log_prob(cat_xy)
 
         # MSE loss.
         loss = -torch.mean(log_p)
@@ -127,7 +129,7 @@ def main():
     # Make model.
     model = create_rq_nsf().to(DEVICE)
     optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
-    #lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 600, 0.5)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 25, 0.6)
 
     writer = SummaryWriter(args.log_dir)
 
@@ -139,7 +141,7 @@ def main():
     for epoch in trange(EPOCHS):
         train(dataset, model, optim, train_loader, writer)
         val(dataset, model, val_loader, writer)
-        #lr_scheduler.step()
+        lr_scheduler.step()
 
     torch.save(model.state_dict(), args.log_dir / f"model_e{epoch}.pt")
 
