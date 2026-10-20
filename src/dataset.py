@@ -94,12 +94,16 @@ class FetDataset(Dataset):
     def unnormalize(self, data, col_indices=None):
         """Undo the normalize and log. In place.
         Convert from logits to original units.
-        
+
         data: (B, D) tensor of logits.
         col_indices: None or (B,).
             If None, data is assumed to be the first D columns.
             Else, use given column indices.
         """
+        if isinstance(col_indices, int):
+            data = data[:, None]
+            col_indices = [col_indices]
+
         for i in range(data.shape[1]):
             # Index i in data, but col in mean etc..
             col = i if col_indices is None else col_indices[i]

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from dataset import FetDataset
+from dataset import *
 from nsf_model import create_rq_nsf
 
 
@@ -52,6 +52,39 @@ def plot_2d_nll(dataset, model, grid_size=64, bv_min=-2, bv_max=2, rsp_min=-2, r
     plt.show()
 
 
+def test_inverse_design(dataset, model, steps=100):
+    """Generate X from first Y in dataset
+    by minimizing Z using the model.
+    """
+    y = dataset.data[0, X_DIM:]
+    gt_x = dataset.data[0, :X_DIM]
+    x = torch.zeros([X_DIM], requires_grad=True)
+
+    optim = torch.optim.Adam([x], lr=1e-1)
+
+    nll_values = []
+    mse_values = []
+    for _ in range(steps):
+        input = torch.cat([x, y]).unsqueeze(0)
+        nll = -model.log_prob(input)
+
+        nll.backward()
+        optim.step()
+        optim.zero_grad()
+
+        nll_values.append(nll.item())
+
+    print(f"Y:    {y}")
+    print(f"X:    {x}")
+    print(f"GT X: {gt_x}")
+    print(f"Final loss: {nll_values[-1]}")
+
+    plt.plot(nll_values)
+    plt.show()
+
+    return x
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset")
@@ -63,7 +96,10 @@ def main():
     model = create_rq_nsf()
     model.load_state_dict(torch.load(args.model))
 
-    plot_2d_nll(dataset, model)
+    #plot_2d_nll(dataset, model)
+
+    x = test_inverse_design(dataset, model)
+    torch.save(x, "x.pt")
 
 
 if __name__ == "__main__":
