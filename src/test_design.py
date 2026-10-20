@@ -12,9 +12,6 @@ from dataset import FetDataset, X_DIM
 from inverse_gd import InverseGD
 from dnn_model import FetDNNModel
 
-BV_FLOOR = -0.3
-VTH_TARGET = 0.25
-
 
 # Plotting funcs.
 
@@ -25,18 +22,23 @@ def plot_2d_trajs(dataset, results, labels):
     """
     def plot_fig(ind_x, ind_y):
         # Plot dataset.
-        plt.scatter(dataset.data[:, ind_x], dataset.data[:, ind_y], color="pink", alpha=0.6)
+        xs = dataset.unnormalize(dataset.data[:, ind_x], ind_x)
+        ys = dataset.unnormalize(dataset.data[:, ind_y], ind_y)
+        plt.scatter(xs, ys, color="pink", alpha=0.7)
 
         # Plot each traj.
         for i in range(len(results)):
             traj_y = results[i][1].detach().cpu().numpy()
-            plt.plot(traj_y[:, ind_x], traj_y[:, ind_y], label=labels[i])
+            xs = dataset.unnormalize(traj_y[:, ind_x], ind_x)
+            ys = dataset.unnormalize(traj_y[:, ind_y], ind_y)
+            linewidth = 3 if i == 0 else 1
+            plt.plot(xs, ys, label=labels[i], linewidth=linewidth)
 
     # BV-Rsp.
     plt.figure()
     plot_fig(-3, -4)
-    plt.xlabel("BV")
-    plt.ylabel("Rsp")
+    plt.xlabel("BV (Volts)")
+    plt.ylabel("Rsp (Ohms)")
     plt.legend()
     plt.tight_layout()
     plt.show()
@@ -44,8 +46,8 @@ def plot_2d_trajs(dataset, results, labels):
     # Vth-Rsp
     plt.figure()
     plot_fig(-1, -4)
-    plt.xlabel("Vth")
-    plt.ylabel("Rsp")
+    plt.xlabel("Vth (Volts)")
+    plt.ylabel("Rsp (Ohms)")
     plt.legend()
     plt.tight_layout()
     plt.show()
@@ -155,114 +157,43 @@ def wall_x(dataset):
     return criterion
 
 
-def min_rsp(x, y, raw_x, raw_y):
-    return y[0]
+def y_minimize(ind):
+    def func(x, y, raw_x, raw_y):
+        return y[ind]
+    return func
+
+def y_floor(ind, floor):
+    def func(x, y, raw_x, raw_y):
+        return -torch.log(y[ind] - floor)
+    return func
+
+def y_target(ind, target):
+    def func(x, y, raw_x, raw_y):
+        return torch.mean((y[ind] - target) ** 2)
+    return func
 
 
-def bv_floor(x, y, raw_x, raw_y):
-    return -torch.log(y[1] - BV_FLOOR)
+# Design tests.
 
-
-def target_vth(x, y, raw_x, raw_y):
-    return torch.mean((y[3] - VTH_TARGET) ** 2)
-
-
-def impossible_design(dataset, model):
-    """Test infeasible design.
+def test_std_design(dataset, model, bv_floor, vth_target):
+    """Criteria: wall X, minimize Rsp, BV > x, Vth = x
     """
-    def target_bv_rsp(x, y, raw_x, raw_y):
-        return (y[0] + 0.5) ** 2 + (y[1] - 0.5) ** 2
-
-    results = []
-    designer = InverseGD(dataset, model)
-    designer.add_criterion(target_bv_rsp, 1)
-    results.append(designer.run_inverse_design(1000))
-
-    designer.add_criterion(wall_x(dataset), 2e-3)
-    results.append(designer.run_inverse_design(1000))
-
-    plot_2d_trajs(dataset, results, ("Without X barrier", "With X barrier"))
-
-
-def test_wall_weights(dataset, model):
-    """Test different weights for wall_x criterion.
-    """
-    # Run GD.
-    weights = (1e-2, 1e-1, 1, 0)
+    # Test different Wall X weights.
+    weights = (1e-2, 0)
     results = []
     for weight in weights:
         designer = InverseGD(dataset, model)
         designer.add_criterion(wall_x(dataset), weight)
-        designer.add_criterion(min_rsp, 1)
+        # Minimize Rsp.
+        designer.add_criterion(y_minimize(0), 1)
+        # BV > x.
+        designer.add_criterion(y_floor(1, bv_floor), 1e-2)
+        # Vth = x.
+        designer.add_criterion(y_target(3, vth_target), 1)
 
-        traj_x, traj_y, losses = designer.run_inverse_design(1000)
-        results.append((traj_x, traj_y, losses))
+        results.append(designer.run_inverse_design(2000))
 
-    plot_2d_trajs(dataset, results, weights)
-
-
-def test_bv_floor(dataset, model):
-    """Test BV barrier.
-    """
-    # Print BV value.
-    bv_value = dataset.unnormalize(torch.tensor([[BV_FLOOR]]), [-3])
-    print(f"BV corr. to logit {BV_FLOOR}:", bv_value)
-
-    results = []
-    # No BV.
-    designer = InverseGD(dataset, model)
-    designer.add_criterion(wall_x(dataset), 2e-2)
-    designer.add_criterion(min_rsp, 1)
-    results.append(designer.run_inverse_design(1000))
-
-    # Yes BV.
-    designer.add_criterion(bv_floor, 1e-2)
-    results.append(designer.run_inverse_design(1000))
-
-    plot_2d_trajs(dataset, results, ("No BV constraint", f"BV > {BV_FLOOR}"))
-    return results[-1]
-
-
-def test_target_vth(dataset, model):
-    # Print Vth value.
-    vth_value = dataset.unnormalize(torch.tensor([[VTH_TARGET]]), [-1])
-    print(f"Vth corr. to logit {VTH_TARGET}:", vth_value)
-
-    results = []
-    # No Vth.
-    designer = InverseGD(dataset, model)
-    designer.add_criterion(wall_x(dataset), 2e-2)
-    designer.add_criterion(min_rsp, 1)
-    designer.add_criterion(bv_floor, 1e-2)
-    results.append(designer.run_inverse_design(1000))
-
-    # Yes Vth.
-    designer.add_criterion(target_vth, 5)
-    results.append(designer.run_inverse_design(1000))
-
-    plot_2d_trajs(dataset, results, ("No Vth constraint", f"Vth = "))
-    return results[-1]
-
-
-def test_ipm(dataset, model):
-    """Test interior point method.
-    """
-    def wall_weight(t):
-        exponent = np.interp(t, [0, 1], [-1, -2])
-        return 10 ** exponent
-
-    bv_value = dataset.unnormalize(torch.tensor([[BV_FLOOR]]), [-3])
-    print(f"BV corr. to logit {BV_FLOOR}:", bv_value)
-
-    designer = InverseGD(dataset, model)
-    designer.add_criterion(wall_x(dataset), wall_weight)
-    designer.add_criterion(min_rsp, 1)
-    designer.add_criterion(bv_floor, 1e-2)
-
-    results = []
-    results.append(designer.run_inverse_design(1000))
-
-    plot_2d_trajs(dataset, results, ("IPM",))
+    plot_2d_trajs(dataset, results, ("With recipe feasibility barrier", "No barrier"))
     return results[-1]
 
 
@@ -278,18 +209,17 @@ def main():
     model.load_state_dict(torch.load(args.model))
     model.eval()
 
-    designer = InverseGD(dataset, model)
-    designer.add_criterion(wall_x(dataset), 1)
-    #designer.add_criterion(min_rsp, 1)
-    plot_loss_map(dataset, model, designer)
-    stop
+    # Extract target BV and Vth normalized values.
+    bv_target = 15
+    bv_logit = (bv_target - dataset.means[-3]) / dataset.stds[-3]
+    print(f"BV={bv_target}, logit={bv_logit}")
+
+    vth_target = 1
+    vth_logit = (vth_target - dataset.means[-1]) / dataset.stds[-1]
+    print(f"Vth={vth_target}, logit={vth_logit}")
 
     # Design.
-    #impossible_design(dataset, model)
-    #test_wall_weights(dataset, model)
-    #result = test_bv_floor(dataset, model)
-    #result = test_target_vth(dataset, model)
-    result = test_ipm(dataset, model)
+    result = test_std_design(dataset, model, bv_logit, vth_logit)
 
     # Save results.
     result = torch.cat((result[0][-1], result[1][-1]))
