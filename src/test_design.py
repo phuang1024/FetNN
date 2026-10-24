@@ -12,6 +12,9 @@ from dataset import FetDataset, X_DIM
 from inverse_gd import InverseGD
 from dnn_model import FetDNNModel
 
+BV_TARGET = 15
+VTH_TARGET = 1.5
+
 
 # Plotting funcs.
 
@@ -20,36 +23,59 @@ def plot_2d_trajs(dataset, results, labels):
 
     results: List of (traj_x, traj_y, losses)
     """
-    def plot_fig(ind_x, ind_y):
+    def plot_fig(ind_x, ind_y, ax):
         # Plot dataset.
         xs = dataset.unnormalize(dataset.data[:, ind_x], ind_x)
         ys = dataset.unnormalize(dataset.data[:, ind_y], ind_y)
-        plt.scatter(xs, ys, color="pink", alpha=0.7)
+        ax.scatter(xs, ys, color="plum", alpha=0.7)
 
         # Plot each traj.
         for i in range(len(results)):
             traj_y = results[i][1].detach().cpu().numpy()
             xs = dataset.unnormalize(traj_y[:, ind_x], ind_x)
             ys = dataset.unnormalize(traj_y[:, ind_y], ind_y)
-            linewidth = 3 if i == 0 else 1
-            plt.plot(xs, ys, label=labels[i], linewidth=linewidth)
+
+            linewidth = 3 if i == 0 else 2
+            ax.plot(xs, ys, label=labels[i], linewidth=linewidth)
+
+            # Plot direction arrows.
+            for j in range(20, 260, 50):
+                x1 = xs[j]
+                x2 = xs[j + 1]
+                y1 = ys[j]
+                y2 = ys[j + 1]
+                ax.annotate("", xy=(x2, y2), xytext=(x1, y1), arrowprops={
+                    "arrowstyle": "-|>",
+                    "color": f"C{i}",
+                    "lw": 0,
+                    "mutation_scale": 20,
+                })
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
 
     # BV-Rsp.
-    plt.figure()
-    plot_fig(-3, -4)
-    plt.xlabel("BV (Volts)")
-    plt.ylabel("Rsp (Ohms)")
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+    plot_fig(-3, -4, ax1)
+
+    x_min, x_max = ax1.get_xlim()
+    ax1.axvspan(x_min, BV_TARGET, color="red", alpha=0.2, hatch="/")
+    ax1.set_xlim(x_min, x_max)
+
+    ax1.set_xlabel("BV (Volts)")
+    ax1.set_ylabel("$R_{sp}$ (Ohms)")
+    #ax1.legend()
 
     # Vth-Rsp
-    plt.figure()
-    plot_fig(-1, -4)
-    plt.xlabel("Vth (Volts)")
-    plt.ylabel("Rsp (Ohms)")
-    plt.legend()
+    plot_fig(-1, -4, ax2)
+
+    x_min, x_max = ax2.get_xlim()
+    ax2.axvspan(VTH_TARGET - 0.1, VTH_TARGET + 0.1, color="green", alpha=0.2)
+    ax2.set_xlim(x_min, x_max)
+
+    ax2.set_xlabel("$V_{th}$ (Volts)")
+    ax2.legend()
+
     plt.tight_layout()
+    plt.subplots_adjust(wspace=0, hspace=0)
     plt.show()
 
 
@@ -141,20 +167,17 @@ def plot_loss_map(dataset, model, designer, points=10000):
 def wall_x(dataset):
     """Create X barrier criterion based on dataset extrema.
     """
-    maxes, _ = torch.max(dataset.data, dim=0)
-    mins, _ = torch.min(dataset.data, dim=0)
-
     # Column indices to skip.
-    skip = (3, 4, 10,)
+    #skip = (3, 4, 10,)
 
-    def criterion(x, y, raw_x, raw_y):
+    def func(x, y, raw_x, raw_y):
         loss = 0
         for i in range(len(x)):
             #if i not in skip:
-                loss -= torch.log(x[i] - mins[i])
-                loss -= torch.log(maxes[i] - x[i])
+                loss -= torch.log(x[i] - dataset.mins[i])
+                loss -= torch.log(dataset.maxes[i] - x[i])
         return loss
-    return criterion
+    return func
 
 
 def y_minimize(ind):
@@ -180,6 +203,7 @@ def test_std_design(dataset, model, bv_floor, vth_target):
     """
     # Test different Wall X weights.
     weights = (1e-2, 0)
+    labels = ("With recipe feasibility barrier", "No barrier")
     results = []
     for weight in weights:
         designer = InverseGD(dataset, model)
@@ -191,10 +215,20 @@ def test_std_design(dataset, model, bv_floor, vth_target):
         # Vth = x.
         designer.add_criterion(y_target(3, vth_target), 1)
 
-        results.append(designer.run_inverse_design(2000))
+        results.append(designer.run_inverse_design(300))
 
-    plot_2d_trajs(dataset, results, ("With recipe feasibility barrier", "No barrier"))
-    return results[-1]
+    # Print recipe normalized btwn min/max.
+    for i in range(len(results)):
+        norm_x = results[i][0][-1]
+        unnormed_x = dataset.unnormalize(norm_x.unsqueeze(0), range(X_DIM))
+        norm_x = (norm_x - dataset.mins[:X_DIM]) / (dataset.maxes[:X_DIM] - dataset.mins[:X_DIM])
+        norm_x = norm_x[:X_DIM]
+        print(f"Label: {labels[i]}")
+        print(f"    Min-max normed recipe: {norm_x}")
+        print(f"    Unnormed: {unnormed_x}")
+
+    plot_2d_trajs(dataset, results, labels)
+    return results[0]
 
 
 def main():
@@ -210,13 +244,11 @@ def main():
     model.eval()
 
     # Extract target BV and Vth normalized values.
-    bv_target = 15
-    bv_logit = (bv_target - dataset.means[-3]) / dataset.stds[-3]
-    print(f"BV={bv_target}, logit={bv_logit}")
+    bv_logit = (BV_TARGET - dataset.means[-3]) / dataset.stds[-3]
+    print(f"BV={BV_TARGET}, logit={bv_logit}")
 
-    vth_target = 1
-    vth_logit = (vth_target - dataset.means[-1]) / dataset.stds[-1]
-    print(f"Vth={vth_target}, logit={vth_logit}")
+    vth_logit = (VTH_TARGET - dataset.means[-1]) / dataset.stds[-1]
+    print(f"Vth={VTH_TARGET}, logit={vth_logit}")
 
     # Design.
     result = test_std_design(dataset, model, bv_logit, vth_logit)

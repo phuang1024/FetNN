@@ -91,6 +91,10 @@ class FetDataset(Dataset):
             self.means.append(mean)
             self.stds.append(std)
 
+        # Get per-dim maxes and mins.
+        self.maxes, _ = torch.max(self.data, dim=0)
+        self.mins, _ = torch.min(self.data, dim=0)
+
     def unnormalize(self, data, col_indices=None):
         """Undo the normalize and log. In place.
         Convert from logits to original units.
