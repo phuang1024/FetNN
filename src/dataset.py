@@ -96,7 +96,7 @@ class FetDataset(Dataset):
         self.mins, _ = torch.min(self.data, dim=0)
 
     def unnormalize(self, data, col_indices=None):
-        """Undo the normalize and log. In place.
+        """Undo the normalize and log.
         Convert from logits to original units.
 
         data: (B, D) tensor of logits.
@@ -104,6 +104,7 @@ class FetDataset(Dataset):
             If None, data is assumed to be the first D columns.
             Else, use given column indices.
         """
+        data = torch.tensor(data)
         if isinstance(col_indices, int):
             data = data[:, None]
             col_indices = [col_indices]

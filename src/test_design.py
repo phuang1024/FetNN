@@ -203,7 +203,10 @@ def test_std_design(dataset, model, bv_floor, vth_target):
     """
     # Test different Wall X weights.
     weights = (1e-2, 0)
-    labels = ("With recipe feasibility barrier", "No barrier")
+    labels = ("With 2-sided X barrier", "No barrier")
+    # weights = (1e-2,)
+    # labels = ("Design trajectory",)
+
     results = []
     for weight in weights:
         designer = InverseGD(dataset, model)
@@ -215,7 +218,7 @@ def test_std_design(dataset, model, bv_floor, vth_target):
         # Vth = x.
         designer.add_criterion(y_target(3, vth_target), 1)
 
-        results.append(designer.run_inverse_design(300))
+        results.append(designer.run_inverse_design(1000))
 
     # Print recipe normalized btwn min/max.
     for i in range(len(results)):
@@ -261,4 +264,8 @@ def main():
 
 
 if __name__ == "__main__":
+    plt.rc("axes", titlesize=16)
+    plt.rc("axes", labelsize=14)
+    plt.rc("legend", fontsize=15)
+
     main()
