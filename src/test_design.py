@@ -39,7 +39,7 @@ def plot_2d_trajs(dataset, results, labels):
             ax.plot(xs, ys, label=labels[i], linewidth=linewidth)
 
             # Plot direction arrows.
-            for j in range(20, 260, 50):
+            for j in range(10, 260, 100):
                 x1 = xs[j]
                 x2 = xs[j + 1]
                 y1 = ys[j]
@@ -49,6 +49,7 @@ def plot_2d_trajs(dataset, results, labels):
                     "color": f"C{i}",
                     "lw": 0,
                     "mutation_scale": 20,
+                    "alpha": 0.8,
                 })
 
     fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
