@@ -95,26 +95,40 @@ class FetDataset(Dataset):
         self.maxes, _ = torch.max(self.data, dim=0)
         self.mins, _ = torch.min(self.data, dim=0)
 
-    def unnormalize(self, data, col_indices=None):
-        """Undo the normalize and log.
-        Convert from logits to original units.
-
-        data: (B, D) tensor of logits.
-        col_indices: None or (B,).
-            If None, data is assumed to be the first D columns.
-            Else, use given column indices.
+    def normalize(self, data, col_indices=None):
+        """Normalize and log (if applicable) arbitrary data according to
+        this dataset's means and stds.
+        data: (B, D).
+        col_indices:
+            None: Use indices 0 to D-1.
+            List: data[:, i] is column col_indices[i]
         """
+        # Copy data.
         data = torch.tensor(data)
-        if isinstance(col_indices, int):
-            data = data[:, None]
-            col_indices = [col_indices]
 
         for i in range(data.shape[1]):
-            # Index i in data, but col in mean etc..
+            # Get column index.
             col = i if col_indices is None else col_indices[i]
+
+            if LOG_FEATURE[col]:
+                data[:, i] = torch.log1p(data[:, i])
+            data[:, i] = (data[:, i] - self.means[col]) / self.stds[col]
+
+        return data
+
+    def unnormalize(self, data, col_indices=None):
+        """Counterpart of normalize().
+        """
+        data = torch.tensor(data)
+
+        for i in range(data.shape[1]):
+            # Get column index.
+            col = i if col_indices is None else col_indices[i]
+
             data[:, i] = data[:, i] * self.stds[col] + self.means[col]
             if LOG_FEATURE[col]:
                 data[:, i] = torch.expm1(data[:, i])
+
         return data
 
     def __len__(self):

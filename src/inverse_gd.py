@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 from dataset import *
-from dnn_model import FetDNNModel
+from model import FetDNNModel
 
 
 class InverseGD:

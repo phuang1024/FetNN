@@ -10,7 +10,7 @@ import torch
 
 from dataset import FetDataset, X_DIM
 from inverse_gd import InverseGD
-from dnn_model import FetDNNModel
+from model import FetDNNModel
 
 BV_TARGET = 15
 VTH_TARGET = 1.5
@@ -25,15 +25,15 @@ def plot_2d_trajs(dataset, results, labels):
     """
     def plot_fig(ind_x, ind_y, ax):
         # Plot dataset.
-        xs = dataset.unnormalize(dataset.data[:, ind_x], ind_x)
-        ys = dataset.unnormalize(dataset.data[:, ind_y], ind_y)
+        xs = dataset.unnormalize(dataset.data[:, ind_x][:, None], [ind_x])
+        ys = dataset.unnormalize(dataset.data[:, ind_y][:, None], [ind_y])
         ax.scatter(xs, ys, color="plum", alpha=0.7)
 
         # Plot each traj.
         for i in range(len(results)):
             traj_y = results[i][1].detach().cpu().numpy()
-            xs = dataset.unnormalize(traj_y[:, ind_x], ind_x)
-            ys = dataset.unnormalize(traj_y[:, ind_y], ind_y)
+            xs = dataset.unnormalize(traj_y[:, ind_x][:, None], [ind_x])
+            ys = dataset.unnormalize(traj_y[:, ind_y][:, None], [ind_y])
 
             linewidth = 3 if i == 0 else 2
             ax.plot(xs, ys, label=labels[i], linewidth=linewidth)
@@ -225,6 +225,7 @@ def test_std_design(dataset, model, bv_floor, vth_target):
     for i in range(len(results)):
         norm_x = results[i][0][-1]
         unnormed_x = dataset.unnormalize(norm_x.unsqueeze(0), range(X_DIM))
+
         norm_x = (norm_x - dataset.mins[:X_DIM]) / (dataset.maxes[:X_DIM] - dataset.mins[:X_DIM])
         norm_x = norm_x[:X_DIM]
         print(f"Label: {labels[i]}")
@@ -248,10 +249,8 @@ def main():
     model.eval()
 
     # Extract target BV and Vth normalized values.
-    bv_logit = (BV_TARGET - dataset.means[-3]) / dataset.stds[-3]
+    bv_logit, vth_logit = dataset.normalize([[BV_TARGET, VTH_TARGET]], [-3, -1]).squeeze(0)
     print(f"BV={BV_TARGET}, logit={bv_logit}")
-
-    vth_logit = (VTH_TARGET - dataset.means[-1]) / dataset.stds[-1]
     print(f"Vth={VTH_TARGET}, logit={vth_logit}")
 
     # Design.
@@ -259,7 +258,7 @@ def main():
 
     # Save results.
     result = torch.cat((result[0][-1], result[1][-1]))
-    result = dataset.unnormalize(result.unsqueeze(0))
+    result = dataset.unnormalize(result.unsqueeze(0), range(len(result)))
     print(result)
     write_recipes(result, "nodes.csv")
 

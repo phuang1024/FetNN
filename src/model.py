@@ -1,5 +1,5 @@
 """DNN forward surrogate.
-Run this file to train.
+Run this file to train or test.
 """
 
 import argparse
@@ -59,7 +59,7 @@ def augment_data(x, y, noise=1e-3):
     return x, y
 
 
-def train(dataset, model, optim, train_loader, writer):
+def train_epoch(dataset, model, optim, train_loader, writer):
     global global_step
     model.train()
 
@@ -78,7 +78,7 @@ def train(dataset, model, optim, train_loader, writer):
 
 
 @torch.no_grad()
-def val(dataset, model, val_loader, writer):
+def val_epoch(dataset, model, val_loader, writer):
     model.eval()
 
     total_mse = 0
@@ -104,7 +104,7 @@ def val(dataset, model, val_loader, writer):
     # TODO generate samples
 
 
-def main():
+def train():
     parser = argparse.ArgumentParser()
     parser.add_argument("data")
     parser.add_argument("log_dir", type=Path)
@@ -127,12 +127,28 @@ def main():
 
     global epoch
     for epoch in trange(EPOCHS):
-        train(dataset, model, optim, train_loader, writer)
-        val(dataset, model, val_loader, writer)
+        train_epoch(dataset, model, optim, train_loader, writer)
+        val_epoch(dataset, model, val_loader, writer)
         lr_scheduler.step()
 
     torch.save(model.state_dict(), args.log_dir / f"model_e{epoch}.pt")
 
 
+def test():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("dataset")
+    parser.add_argument("model")
+    args = parser.parse_args()
+
+    dataset = FetDataset(args.dataset, "cpu")
+
+    model = FetDNNModel()
+    model.load_state_dict(torch.load(args.model))
+
+    x = torch.load("x.pt").unsqueeze(0)
+    y = model(x)
+    print(y)
+
+
 if __name__ == "__main__":
-    main()
+    train()
