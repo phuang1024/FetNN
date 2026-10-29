@@ -83,4 +83,47 @@ class InverseGD:
             traj_y[i] = pred_y
             losses[i] = loss
 
+            if torch.isnan(loss):
+                return None
+
         return traj_x, traj_y, losses
+
+
+def wall_x(dataset, skip_inds=None):
+    """Create X barrier criterion based on dataset extrema.
+    Two sided barrier per X dimension.
+    skip_inds: Tuple of indices to skip.
+    """
+    if skip_inds is None:
+        skip_inds = ()
+
+    def func(x, y, raw_x, raw_y):
+        loss = 0
+        for i in range(len(x)):
+            if i not in skip_inds:
+                loss -= torch.log(x[i] - dataset.mins[i])
+                loss -= torch.log(dataset.maxes[i] - x[i])
+        return loss
+    return func
+
+
+def y_minimize(ind):
+    """Criterion to minimize one dimension of Y.
+    """
+    def func(x, y, raw_x, raw_y):
+        return y[ind]
+    return func
+
+def y_floor(ind, floor):
+    """Criterion that Y[i] > floor.
+    """
+    def func(x, y, raw_x, raw_y):
+        return -torch.log(y[ind] - floor)
+    return func
+
+def y_target(ind, target):
+    """Criterion that Y[i] = target via MSE loss.
+    """
+    def func(x, y, raw_x, raw_y):
+        return torch.mean((y[ind] - target) ** 2)
+    return func

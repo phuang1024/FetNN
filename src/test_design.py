@@ -9,7 +9,7 @@ import numpy as np
 import torch
 
 from dataset import FetDataset, X_DIM
-from inverse_gd import InverseGD
+from inverse_gd import *
 from model import FetDNNModel
 
 BV_TARGET = 15
@@ -161,40 +161,6 @@ def plot_loss_map(dataset, model, designer, points=10000):
 
     plt.tight_layout()
     plt.show()
-
-
-# Example constraint funcs.
-
-def wall_x(dataset):
-    """Create X barrier criterion based on dataset extrema.
-    """
-    # Column indices to skip.
-    #skip = (3, 4, 10,)
-
-    def func(x, y, raw_x, raw_y):
-        loss = 0
-        for i in range(len(x)):
-            #if i not in skip:
-                loss -= torch.log(x[i] - dataset.mins[i])
-                loss -= torch.log(dataset.maxes[i] - x[i])
-        return loss
-    return func
-
-
-def y_minimize(ind):
-    def func(x, y, raw_x, raw_y):
-        return y[ind]
-    return func
-
-def y_floor(ind, floor):
-    def func(x, y, raw_x, raw_y):
-        return -torch.log(y[ind] - floor)
-    return func
-
-def y_target(ind, target):
-    def func(x, y, raw_x, raw_y):
-        return torch.mean((y[ind] - target) ** 2)
-    return func
 
 
 # Design tests.
