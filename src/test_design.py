@@ -16,8 +16,6 @@ BV_TARGET = 15
 VTH_TARGET = 1.5
 
 
-# Plotting funcs.
-
 def plot_2d_trajs(dataset, results, labels):
     """Plot trajectories and scatter dataset.
 
@@ -80,31 +78,6 @@ def plot_2d_trajs(dataset, results, labels):
     plt.show()
 
 
-def plot_design_losses(traj_x, losses):
-    """Plot losses and step sizes over time.
-    """
-    # Loss over time.
-    plt.figure()
-    plt.plot(losses, color="blue", label="Loss")
-    plt.ylabel("Loss")
-
-    # Step sizes.
-    step_sizes = []
-    for i in range(len(traj_x) - 1):
-        size = np.linalg.norm(traj_x[i + 1] - traj_x[i])
-        step_sizes.append(size)
-
-    plt.twinx()
-    plt.plot(step_sizes, color="orange", label="Step size")
-    plt.ylabel("Step size (normalized)")
-
-    plt.xlabel("Time")
-    plt.legend()
-
-    plt.tight_layout()
-    plt.show()
-
-
 def write_recipes(recipes, file):
     """Write generated recipes to CSV file.
     """
@@ -116,54 +89,6 @@ def write_recipes(recipes, file):
             fp.write(",".join(x))
             fp.write("\n")
 
-
-@torch.no_grad()
-def plot_loss_map(dataset, model, designer, points=10000):
-    """Randomly sample X points and compute loss fn at each.
-    Then plot over 2D map of variables of choice.
-    """
-    # Sample and map X values.
-    xs = torch.rand([points, X_DIM])
-    maxes, _ = torch.max(dataset.data, dim=0)
-    mins, _ = torch.min(dataset.data, dim=0)
-    for i in range(X_DIM):
-        xs[:, i] = xs[:, i] * (maxes[i] - mins[i]) + mins[i]
-
-    # Get corr Y from model.
-    ys = model(xs)
-
-    # Or, use dataset points.
-    """
-    xs = dataset.data[:, :X_DIM]
-    ys = dataset.data[:, X_DIM:]
-    """
-
-    # Get loss values per point.
-    losses = []
-    for i in range(len(xs)):
-        loss = designer.total_loss(xs[i], ys[i], 0)
-        #print(loss)
-        losses.append(loss)
-
-    xs = xs.cpu().numpy()
-    ys = ys.cpu().numpy()
-    losses = np.array(losses)
-    #print(xs.shape, losses.dtype)
-
-    # Scatter over BV-Rsp space.
-    plt.figure()
-    plt.scatter(ys[:, 1], ys[:, 0], c=losses, vmin=-5, vmax=5)
-
-    plt.xlabel("BV")
-    plt.ylabel("Rsp")
-    plt.title("Recipe negative-log barrier loss across dataset.")
-    plt.colorbar()
-
-    plt.tight_layout()
-    plt.show()
-
-
-# Design tests.
 
 def test_std_design(dataset, model, bv_floor, vth_target):
     """Criteria: wall X, minimize Rsp, BV > x, Vth = x

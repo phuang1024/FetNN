@@ -84,6 +84,7 @@ class InverseGD:
             losses[i] = loss
 
             if torch.isnan(loss):
+                print("InverseGD: Loss is nan!")
                 return None
 
         return traj_x, traj_y, losses
@@ -112,6 +113,13 @@ def y_minimize(ind):
     """
     def func(x, y, raw_x, raw_y):
         return y[ind]
+    return func
+    
+def y_maximize(ind):
+    """Criterion to minimize one dimension of Y.
+    """
+    def func(x, y, raw_x, raw_y):
+        return -y[ind]
     return func
 
 def y_floor(ind, floor):
