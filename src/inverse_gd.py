@@ -93,6 +93,7 @@ class InverseGD:
 def wall_x(dataset, skip_inds=None):
     """Create X barrier criterion based on dataset extrema.
     Two sided barrier per X dimension.
+    Transitions from exp to -log once in bounds.
     skip_inds: Tuple of indices to skip.
     """
     if skip_inds is None:
@@ -103,11 +104,12 @@ def wall_x(dataset, skip_inds=None):
         for i in range(len(x)):
             if i not in skip_inds:
                 if x[i] <= dataset.mins[i] or x[i] >= dataset.maxes[i]:
-                    print("wall_x: nan")
-                loss -= torch.log(x[i] - dataset.mins[i])
-                loss -= torch.log(dataset.maxes[i] - x[i])
-                #loss += torch.exp(dataset.mins[i] - x[i])
-                #loss += torch.exp(x[i] - dataset.maxes[i])
+                    loss += torch.exp(dataset.mins[i] - x[i]) * 10
+                    loss += torch.exp(x[i] - dataset.maxes[i]) * 10
+                    #print("wall_x: nan")
+                else:
+                    loss -= torch.log(x[i] - dataset.mins[i])
+                    loss -= torch.log(dataset.maxes[i] - x[i])
 
         return loss
 
@@ -130,12 +132,14 @@ def y_maximize(ind):
 
 def y_floor(ind, floor):
     """Criterion that Y[i] > floor.
+    Transitions from exp to -log once in bounds.
     """
     def func(x, y, raw_x, raw_y):
         if y[ind] <= floor:
-            print("y_floor: nan")
-        return -torch.log(y[ind] - floor)
-        #return torch.exp(floor - y[ind])
+            return torch.exp(floor - y[ind]) * 10
+            #print("y_floor: nan")
+        else:
+            return -torch.log(y[ind] - floor)
 
     return func
 

@@ -132,11 +132,13 @@ def test_inn_seed(dataset, model, bv_floor, vth_target, inn_recipes_path):
     """Same setup as above, but using INN starting point.
     """
     inn_recipes = read_csv(inn_recipes_path)[0]
+    inn_recipes = dataset.normalize(inn_recipes)
+    #inn_recipes = 2 * torch.randn_like(inn_recipes)[:4]
 
     results = []
     for seed in inn_recipes:
         designer = InverseGD(dataset, model)
-        designer.add_criterion(wall_x(dataset), 1e-2)
+        designer.add_criterion(wall_x(dataset), 2e-2)
         # Minimize Rsp.
         designer.add_criterion(y_minimize(0), 1)
         # BV > x.
@@ -144,12 +146,10 @@ def test_inn_seed(dataset, model, bv_floor, vth_target, inn_recipes_path):
         # Vth = x.
         designer.add_criterion(y_target(3, vth_target), 1)
 
-        seed = dataset.normalize(seed.unsqueeze(0)).squeeze(0)
         results.append(designer.run_inverse_design(
-            steps=300,
+            steps=2000,
             start=seed,
         ))
-        break
 
     plot_2d_trajs(dataset, results, range(len(results)))
     return results[0]
