@@ -16,7 +16,7 @@ def plot_pareto(dataset, pareto_pts):
     # Plot dataset.
     xs = dataset.unnormalize(dataset.data[:, -3][:, None], [-3])
     ys = dataset.unnormalize(dataset.data[:, -4][:, None], [-4])
-    plt.scatter(xs, ys, color="plum", alpha=0.6)
+    plt.scatter(xs, ys, color="plum", alpha=0.8, label="TCAD dataset")
 
     # Plot pareto pts.
     pareto_pts = np.array(pareto_pts)

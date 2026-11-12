@@ -25,7 +25,7 @@ def plot_2d_trajs(dataset, results, labels):
         # Plot dataset.
         xs = dataset.unnormalize(dataset.data[:, ind_x][:, None], [ind_x])
         ys = dataset.unnormalize(dataset.data[:, ind_y][:, None], [ind_y])
-        ax.scatter(xs, ys, color="plum", alpha=0.7)
+        ax.scatter(xs, ys, color="plum", alpha=0.7, label="TCAD dataset")
 
         # Plot each traj.
         for i in range(len(results)):
@@ -46,7 +46,7 @@ def plot_2d_trajs(dataset, results, labels):
                     "arrowstyle": "-|>",
                     "color": f"C{i}",
                     "lw": 0,
-                    "mutation_scale": 20,
+                    "mutation_scale": 30,
                     "alpha": 0.8,
                 })
 
@@ -110,7 +110,7 @@ def test_std_design(dataset, model, bv_floor, vth_target):
         # Vth = x.
         designer.add_criterion(y_target(3, vth_target), 1)
 
-        results.append(designer.run_inverse_design(1000))
+        results.append(designer.run_inverse_design(300))
 
     # Print recipe normalized btwn min/max.
     for i in range(len(results)):
