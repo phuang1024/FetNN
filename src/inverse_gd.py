@@ -63,7 +63,7 @@ class InverseGD:
         if start is None:
             x = torch.zeros([X_DIM], requires_grad=True)
         else:
-            x = torch.tensor(start)
+            x = torch.tensor(start, requires_grad=True)
 
         optim = torch.optim.Adam([x], lr=lr)
 
@@ -84,8 +84,8 @@ class InverseGD:
             losses[i] = loss
 
             if torch.isnan(loss):
-                print("InverseGD: Loss is nan!")
-                return None
+                print(f"InverseGD: Loss is nan at iter {i}!")
+                #return None
 
         return traj_x, traj_y, losses
 
@@ -96,12 +96,14 @@ def wall_x(dataset, skip_inds=None):
     skip_inds: Tuple of indices to skip.
     """
     if skip_inds is None:
-        skip_inds = ()
+        skip_inds = (10,)
 
     def func(x, y, raw_x, raw_y):
         loss = 0
         for i in range(len(x)):
             if i not in skip_inds:
+                if x[i] <= dataset.mins[i] or x[i] >= dataset.maxes[i]:
+                    print("wall_x: nan")
                 loss -= torch.log(x[i] - dataset.mins[i])
                 loss -= torch.log(dataset.maxes[i] - x[i])
         return loss
@@ -126,6 +128,8 @@ def y_floor(ind, floor):
     """Criterion that Y[i] > floor.
     """
     def func(x, y, raw_x, raw_y):
+        if y[ind] <= floor:
+            print("y_floor: nan")
         return -torch.log(y[ind] - floor)
     return func
 

@@ -52,24 +52,8 @@ class FetDataset(Dataset):
         """
         self.device = device
 
-        self.load_data(path)
+        self.raw_data, self.labels = read_csv(path)
         self.preprocess_data()
-
-    def load_data(self, path):
-        """Load raw data from CSV.
-        Sets self.raw_data, self.labels.
-        """
-        self.raw_data = []
-        with open(path) as fp:
-            reader = csv.reader(fp)
-            for i, line in enumerate(reader):
-                # First line is labels.
-                if i == 0:
-                    self.labels = line
-                else:
-                    self.raw_data.append(list(map(float, line)))
-
-        self.raw_data = torch.tensor(self.raw_data, dtype=torch.float)
 
     def preprocess_data(self):
         """Log and normalize features.
@@ -140,6 +124,24 @@ class FetDataset(Dataset):
         return x, y
 
 
+def read_csv(path):
+    """Load raw data from CSV.
+    return: raw_data, labels
+    """
+    raw_data = []
+    with open(path) as fp:
+        reader = csv.reader(fp)
+        for i, line in enumerate(reader):
+            # First line is labels.
+            if i == 0:
+                labels = line
+            else:
+                raw_data.append(list(map(float, line)))
+
+    raw_data = torch.tensor(raw_data, dtype=torch.float)
+    return raw_data, labels
+
+
 def split_train_val(dataset, ratio, batch_size):
     """Helper func to split dataset.
     """
@@ -192,5 +194,5 @@ if __name__ == "__main__":
     print("  x:", x.shape, x.dtype, x)
     print("  y:", y.shape, y.dtype, y)
 
-    #plot_feature_dists(dataset)
-    plot_2d(dataset, 1, -4, "tox", "Rsp")
+    plot_feature_dists(dataset)
+    #plot_2d(dataset, 1, -4, "tox", "Rsp")

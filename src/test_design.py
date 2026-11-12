@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from dataset import FetDataset, X_DIM
+from dataset import FetDataset, read_csv, X_DIM
 from inverse_gd import *
 from model import FetDNNModel
 
@@ -84,14 +84,15 @@ def write_recipes(recipes, file):
     with open(file, "w") as fp:
         fp.write("Lsti,tox,nwellD1,nwellD2,nwellD3,dose_energy1,dose_energy2,dose_energy3,aneal_temp,Lextra,high_k,Rsp,BV,Rout,vth\n")
         for x in recipes:
-            x = x[:11].detach().cpu().tolist()
+            x = x.detach().cpu().tolist()
             x = map(str, x)
             fp.write(",".join(x))
             fp.write("\n")
 
 
-def test_std_design(dataset, model, bv_floor, vth_target):
-    """Criteria: wall X, minimize Rsp, BV > x, Vth = x
+def test_design_weights(dataset, model, bv_floor, vth_target):
+    """This test focuses on customizing loss fns and weights.
+    Criteria: wall X, minimize Rsp, BV > x, Vth = x
     """
     # Test different Wall X weights.
     weights = (1e-2, 0)
@@ -127,6 +128,33 @@ def test_std_design(dataset, model, bv_floor, vth_target):
     return results[0]
 
 
+def test_inn_seed(dataset, model, bv_floor, vth_target, inn_recipes_path):
+    """Same setup as above, but using INN starting point.
+    """
+    inn_recipes = read_csv(inn_recipes_path)[0]
+
+    results = []
+    for seed in inn_recipes:
+        designer = InverseGD(dataset, model)
+        designer.add_criterion(wall_x(dataset), 1e-2)
+        # Minimize Rsp.
+        designer.add_criterion(y_minimize(0), 1)
+        # BV > x.
+        designer.add_criterion(y_floor(1, bv_floor), 1e-2)
+        # Vth = x.
+        designer.add_criterion(y_target(3, vth_target), 1)
+
+        seed = dataset.normalize(seed.unsqueeze(0)).squeeze(0)
+        results.append(designer.run_inverse_design(
+            steps=300,
+            start=seed,
+        ))
+        break
+
+    plot_2d_trajs(dataset, results, range(len(results)))
+    return results[0]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("data")
@@ -145,7 +173,8 @@ def main():
     print(f"Vth={VTH_TARGET}, logit={vth_logit}")
 
     # Design.
-    result = test_std_design(dataset, model, bv_logit, vth_logit)
+    #result = test_design_weights(dataset, model, bv_logit, vth_logit)
+    result = test_inn_seed(dataset, model, bv_logit, vth_logit, "inn_recipes/feasible2.csv")
 
     # Save results.
     result = torch.cat((result[0][-1], result[1][-1]))
