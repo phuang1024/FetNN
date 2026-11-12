@@ -106,7 +106,11 @@ def wall_x(dataset, skip_inds=None):
                     print("wall_x: nan")
                 loss -= torch.log(x[i] - dataset.mins[i])
                 loss -= torch.log(dataset.maxes[i] - x[i])
+                #loss += torch.exp(dataset.mins[i] - x[i])
+                #loss += torch.exp(x[i] - dataset.maxes[i])
+
         return loss
+
     return func
 
 
@@ -116,7 +120,7 @@ def y_minimize(ind):
     def func(x, y, raw_x, raw_y):
         return y[ind]
     return func
-    
+
 def y_maximize(ind):
     """Criterion to minimize one dimension of Y.
     """
@@ -131,6 +135,8 @@ def y_floor(ind, floor):
         if y[ind] <= floor:
             print("y_floor: nan")
         return -torch.log(y[ind] - floor)
+        #return torch.exp(floor - y[ind])
+
     return func
 
 def y_target(ind, target):
