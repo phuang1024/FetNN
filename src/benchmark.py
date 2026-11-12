@@ -18,22 +18,10 @@ ROUT = 1e4
 VTH = 1.5
 
 
-def designs_std(data):
-    """Compute design variability metric.
-    data: (N, Dx)
-    """
-    data = np.array(data)
-    cov = np.cov(data, rowvar=False)
-
-    variance = np.trace(cov)
-    std = np.sqrt(variance)
-    return std
-
-
 def load_models():
     parser = argparse.ArgumentParser()
-    parser.add_argument("data")
-    parser.add_argument("model")
+    parser.add_argument("data", default="../data/new_data_5_filtered.csv")
+    parser.add_argument("model", default="runs/32mlp/model_e2999.pt")
     args = parser.parse_args()
 
     dataset = FetDataset(args.data, "cpu")
@@ -50,12 +38,31 @@ def load_models():
     return dataset, dnn_model, inn_model
 
 
+def constrain_x(dataset, x):
+    """Modify X so each value is inside it's min and max.
+    x: (Dx,)
+    """
+    for i in range(len(x)):
+        x[i] = min(max(x[i], dataset.mins[i] + 1e-3), dataset.maxes[i] - 1e-3)
+
+
+def designs_std(data):
+    """Compute design variability metric.
+    data: (N, Dx)
+    """
+    data = np.array(data)
+    cov = np.cov(data, rowvar=False)
+
+    variance = np.trace(cov)
+    std = np.sqrt(variance)
+    return std
+
+
 def compare_diversity(dataset, dnn_model, inn_model, logits):
     """Compare recipe diversity between INN and GD.
     """
     # INN.
-    inn_designs = inn_inverse(inn_model, logits.unsqueeze(0), 100)
-    inn_designs = inn_designs.squeeze(1)
+    inn_designs = inn_inverse(inn_model, logits.unsqueeze(0), 100).squeeze(1)
 
     # DNN GD.
     designer = InverseGD(dataset, dnn_model)
@@ -83,6 +90,25 @@ def compare_diversity(dataset, dnn_model, inn_model, logits):
     print(f"DNN std: {dnn_std}")
 
 
+def inn_seeds_gd(dataset, dnn_model, inn_model, logits):
+    """Use INN result to seed GD run.
+    """
+    inn_design = inn_inverse(inn_model, logits.unsqueeze(0), 1).squeeze(0).squeeze(0)
+    constrain_x(dataset, inn_design)
+
+    # DNN GD.
+    designer = InverseGD(dataset, dnn_model)
+    designer.add_criterion(wall_x(dataset), 1e-2)
+    for i in range(4):
+        designer.add_criterion(y_target(i, logits[i]), 1)
+
+    results = []
+    results.append(designer.run_inverse_design(500))
+    results.append(designer.run_inverse_design(500, start=inn_design))
+    labels = ("Start at zero", "Start at INN design")
+    plot_2d_trajs(dataset, results, labels)
+
+
 def main():
     dataset, dnn_model, inn_model = load_models()
 
@@ -92,7 +118,8 @@ def main():
         [-4, -3, -2, -1],
     ).squeeze(0)
 
-    compare_diversity(dataset, dnn_model, inn_model, logits)
+    #compare_diversity(dataset, dnn_model, inn_model, logits)
+    inn_seeds_gd(dataset, dnn_model, inn_model, logits)
 
 
 if __name__ == "__main__":

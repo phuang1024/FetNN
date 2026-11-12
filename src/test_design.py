@@ -157,8 +157,8 @@ def test_inn_seed(dataset, model, bv_floor, vth_target, inn_recipes_path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("data")
-    parser.add_argument("model")
+    parser.add_argument("data", default="../data/new_data_5_filtered.csv")
+    parser.add_argument("model", default="runs/32mlp/model_e2999.pt")
     args = parser.parse_args()
 
     dataset = FetDataset(args.data, "cpu")

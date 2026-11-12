@@ -136,8 +136,8 @@ def train():
 
 def test():
     parser = argparse.ArgumentParser()
-    parser.add_argument("dataset")
-    parser.add_argument("model")
+    parser.add_argument("dataset", default="../data/new_data_5_filtered.csv")
+    parser.add_argument("model", default="runs/32mlp/model_e2999.pt")
     args = parser.parse_args()
 
     dataset = FetDataset(args.dataset, "cpu")

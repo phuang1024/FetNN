@@ -184,7 +184,7 @@ def plot_2d(dataset, col1, col2, label1="", label2=""):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("data")
+    parser.add_argument("data", default="../data/new_data_5_filtered.csv")
     args = parser.parse_args()
 
     # Print dataset stats.
