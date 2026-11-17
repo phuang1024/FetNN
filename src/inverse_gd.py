@@ -56,7 +56,7 @@ class InverseGD:
             loss += criterion(x, y, raw_x, raw_y) * weight
         return loss
 
-    def run_inverse_design(self, steps, lr=1e-2, start=None):
+    def run_inverse_design(self, steps, lr=1e-2, optim_alg="adam", start=None):
         """
         start: If None, is set to zero.
         """
@@ -65,7 +65,13 @@ class InverseGD:
         else:
             x = torch.tensor(start, requires_grad=True)
 
-        optim = torch.optim.Adam([x], lr=lr)
+        if optim_alg == "adam":
+            optim = torch.optim.Adam
+        elif optim_alg == "sgd":
+            optim = torch.optim.SGD
+        else:
+            raise ValueError(f"Unknown optimizer {optim_alg}")
+        optim = optim([x], lr=lr)
 
         traj_x = torch.zeros([steps, X_DIM])
         traj_y = torch.zeros([steps, Y_DIM])

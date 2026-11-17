@@ -155,10 +155,33 @@ def test_inn_seed(dataset, model, bv_floor, vth_target, inn_recipes_path):
     return results[0]
 
 
+def test_optim(dataset, model, bv_floor, vth_target):
+    """Test Adam vs SGD
+    """
+    designer = InverseGD(dataset, model)
+    designer.add_criterion(wall_x(dataset), 2e-2)
+    designer.add_criterion(y_minimize(0), 1)
+    designer.add_criterion(y_floor(1, bv_floor), 1e-2)
+    designer.add_criterion(y_target(3, vth_target), 1)
+
+    results = []
+    results.append(designer.run_inverse_design(
+        steps=2000,
+    ))
+    results.append(designer.run_inverse_design(
+        steps=2000,
+        lr=5e-2,
+        optim_alg="sgd",
+    ))
+
+    plot_2d_trajs(dataset, results, ("Adam", "SGD"))
+    return results[0]
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("data", default="../data/new_data_5_filtered.csv")
-    parser.add_argument("model", default="runs/32mlp/model_e2999.pt")
+    parser.add_argument("--data", default="../data/new_data_5_filtered.csv")
+    parser.add_argument("--model", default="runs/32mlp/model_e2999.pt")
     args = parser.parse_args()
 
     dataset = FetDataset(args.data, "cpu")
@@ -174,7 +197,8 @@ def main():
 
     # Design.
     #result = test_design_weights(dataset, model, bv_logit, vth_logit)
-    result = test_inn_seed(dataset, model, bv_logit, vth_logit, "inn_recipes/feasible2.csv")
+    #result = test_inn_seed(dataset, model, bv_logit, vth_logit, "inn_recipes/feasible2.csv")
+    result = test_optim(dataset, model, bv_logit, vth_logit)
 
     # Save results.
     result = torch.cat((result[0][-1], result[1][-1]))
