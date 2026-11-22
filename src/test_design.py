@@ -16,7 +16,7 @@ BV_TARGET = 15
 VTH_TARGET = 1.5
 
 
-def plot_2d_trajs(dataset, results, labels):
+def plot_2d_trajs(dataset, results, labels, arrow_interval=100):
     """Plot trajectories and scatter dataset.
 
     results: List of (traj_x, traj_y, losses)
@@ -37,7 +37,8 @@ def plot_2d_trajs(dataset, results, labels):
             ax.plot(xs, ys, label=labels[i], linewidth=linewidth)
 
             # Plot direction arrows.
-            for j in range(10, 260, 100):
+            j = arrow_interval // 2
+            while j < len(xs) - 1:
                 x1 = xs[j]
                 x2 = xs[j + 1]
                 y1 = ys[j]
@@ -49,6 +50,7 @@ def plot_2d_trajs(dataset, results, labels):
                     "mutation_scale": 30,
                     "alpha": 0.8,
                 })
+                j += arrow_interval
 
     fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
 
