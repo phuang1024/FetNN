@@ -57,8 +57,13 @@ class ComputeIpmValues:
         bv_loss.backward()
         bv_grad = x.grad.numpy()
 
-        constrs = np.array([bv_loss.item()])
-        constrs_grad = np.array([bv_grad]).flatten()
+        x, y = self.run_model(x_array)
+        vth_loss = y[3]
+        vth_loss.backward()
+        vth_grad = x.grad.numpy()
+
+        constrs = np.array([bv_loss.item(), vth_loss.item()])
+        constrs_grad = np.array([bv_grad, vth_grad]).flatten()
 
         self.results = {
             "loss": loss,
@@ -90,13 +95,13 @@ class FetProblem(cyipopt.Problem):
         x_maxes = dataset.maxes[:X_DIM]
         nlp = cls(
             n=X_DIM,
-            m=1,
+            m=2,
             lb=x_mins,
             ub=x_maxes,
-            cl=[bv_logit],
-            cu=[1e9],
+            cl=[bv_logit, vth_logit - 0.2],
+            cu=[1e9, vth_logit + 0.2],
         )
-        nlp.add_option("max_iter", 100)
+        nlp.add_option("max_iter", 50)
         return nlp
 
     def objective(self, x):
