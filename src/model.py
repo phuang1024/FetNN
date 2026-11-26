@@ -25,14 +25,14 @@ class FetDNNModel(nn.Module):
 
         self.mlp = nn.Sequential(
             nn.Linear(X_DIM, self.dim_hidden),
-            nn.LeakyReLU(),
-            nn.Dropout(0.1),
+            nn.SiLU(),
+            #nn.Dropout(0.1),
             nn.Linear(self.dim_hidden, self.dim_hidden),
-            nn.LeakyReLU(),
-            nn.Dropout(0.1),
+            nn.SiLU(),
+            #nn.Dropout(0.1),
             nn.Linear(self.dim_hidden, self.dim_hidden),
-            nn.LeakyReLU(),
-            nn.Dropout(0.1),
+            nn.SiLU(),
+            #nn.Dropout(0.1),
             nn.Linear(self.dim_hidden, Y_DIM),
         )
 
@@ -43,9 +43,9 @@ class FetDNNModel(nn.Module):
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # TODO tune this.
-EPOCHS = 3000
-BATCH_SIZE = 64
-LR = 1e-3
+EPOCHS = 5000
+BATCH_SIZE = 256
+LR = 2e-3
 
 epoch = 0
 global_step = 0
@@ -64,7 +64,7 @@ def train_epoch(dataset, model, optim, train_loader, writer):
     model.train()
 
     for x, y in train_loader:
-        x, y = augment_data(x, y)
+        #x, y = augment_data(x, y)
         pred = model(x)
 
         loss = torch.nn.functional.mse_loss(pred, y)
@@ -105,6 +105,9 @@ def val_epoch(dataset, model, val_loader, writer):
 
 
 def train():
+    torch.set_num_threads(8)
+    torch.set_num_interop_threads(2)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("data")
     parser.add_argument("log_dir", type=Path)
@@ -116,8 +119,8 @@ def train():
 
     # Make model.
     model = FetDNNModel().to(DEVICE)
-    optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 600, 0.5)
+    optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 1000, 0.5)
 
     writer = SummaryWriter(args.log_dir)
 
