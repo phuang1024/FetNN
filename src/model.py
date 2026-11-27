@@ -40,8 +40,9 @@ class FetDNNModel(nn.Module):
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-LBFGS = True
-EPOCHS = 1000
+ADAM_BS = 256
+ADAM_LR = 2e-3
+WEIGHT_DECAY = 1e-5
 
 
 @torch.no_grad()
@@ -52,7 +53,10 @@ def augment_data(x, y, noise=1e-3):
     return x, y
 
 
-def train_epoch_adam(dataset, train_loader, model, optim, writer, epoch):
+def train_epoch_adam(optim):
+    """Train with Adam optimizer.
+    """
+    train_loader = DataLoader(train_data, batch_size=ADAM_BS, shuffle=True)
     model.train()
 
     total_mse = 0
@@ -68,61 +72,68 @@ def train_epoch_adam(dataset, train_loader, model, optim, writer, epoch):
         optim.zero_grad()
 
     total_mse /= len(train_loader)
-    writer.add_scalar("train/mse", total_mse, epoch)
-    writer.add_scalar("train/lr", optim.param_groups[0]["lr"], epoch)
+    writer.add_scalar("train/mse", total_mse, global_step)
+    writer.add_scalar("train/lr", optim.param_groups[0]["lr"], global_step)
 
 
-def train_epoch_lbfgs(dataset, train_loader, model, optim, writer, epoch):
+def train_epoch_lbfgs(optim):
+    """Train with L-BFGS optimizer.
+    Uses a single batch (per standard practice).
+    """
     def loss_callback():
-        # Weight decay.
         optim.zero_grad()
         pred = model(x)
         loss = mse_loss(pred, y)
 
-        """
+        # Weight decay.
         l2_reg = sum(p.pow(2).sum() for p in model.parameters())
-        loss += l2_reg * 1e-4
-        """
+        loss += l2_reg * WEIGHT_DECAY
 
         loss.backward()
         return loss
 
+    train_loader = DataLoader(train_data, batch_size=len(train_data))
     model.train()
+
     x, y = next(iter(train_loader))
     #x, y = augment_data(x, y)
     total_mse = optim.step(loss_callback)
 
-    writer.add_scalar("train/mse", total_mse.item(), epoch)
+    writer.add_scalar("train/mse", total_mse.item(), global_step)
 
 
 @torch.no_grad()
-def val_epoch(dataset, val_loader, model, writer, epoch):
+def val_epoch():
+    """Compute per-feature MSE and MRE on val set.
+    """
+    train_loader = DataLoader(val_data, batch_size=len(val_data))
     model.eval()
 
-    total_mse = 0
-    total_mre = 0
-    for x, y in val_loader:
-        pred = model(x)
+    x, y = next(iter(train_loader))
+    pred = model(x)
 
-        # MSE loss.
-        loss = torch.nn.functional.mse_loss(pred, y)
-        total_mse += loss.item()
+    # MSE loss.
+    loss = mse_loss(pred, y)
+    total_mse = loss.item()
 
-        # MRE of unnormalized values.
-        y_unnorm = dataset.unnormalize(y, (-4, -3, -2, -1))
-        pred_unnorm = dataset.unnormalize(pred, (-4, -3, -2, -1))
-        mre = torch.abs(pred_unnorm - y_unnorm) / y_unnorm
-        total_mre += torch.mean(mre)
+    # MRE of unnormalized values.
+    y_unnorm = dataset.unnormalize(y, (-4, -3, -2, -1))
+    pred_unnorm = dataset.unnormalize(pred, (-4, -3, -2, -1))
+    mre = torch.abs(pred_unnorm - y_unnorm) / y_unnorm
+    total_mre = torch.mean(mre)
 
-    total_mse /= len(val_loader)
-    total_mre /= len(val_loader)
-    writer.add_scalar("val/mse", total_mse, epoch)
-    writer.add_scalar("val/mre", total_mre, epoch)
-
-    # TODO generate samples
+    writer.add_scalar("val/mse", total_mse, global_step)
+    writer.add_scalar("val/mre", total_mre, global_step)
 
 
-def train():
+def init_weights(model):
+    for m in model.modules():
+        if isinstance(m, nn.Linear):
+            nn.init.kaiming_normal_(m.weight)
+
+
+if __name__ == "__main__":
+    # For CPU utilization.
     torch.set_num_threads(8)
     torch.set_num_interop_threads(2)
 
@@ -133,52 +144,33 @@ def train():
 
     # Make datasets.
     dataset = FetDataset(args.data, DEVICE)
-    if LBFGS:
-        train_loader, val_loader = split_train_val(dataset, 0.8, len(dataset))
-    else:
-        train_loader, val_loader = split_train_val(dataset, 0.8, 256)
+    train_len = int(len(dataset) * 0.8)
+    val_len = len(dataset) - train_len
+    train_data, val_data = random_split(dataset, (train_len, val_len))
 
     # Make model.
     model = FetDNNModel().to(DEVICE)
+    init_weights(model)
     num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(model)
     print("Num params:", num_params)
 
-    if LBFGS:
-        optim = torch.optim.LBFGS(model.parameters())
-    else:
-        optim = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 250, 0.5)
+    # Make optimizers.
+    lbfgs = torch.optim.LBFGS(model.parameters())
+    adam = torch.optim.Adam(model.parameters(), lr=ADAM_LR, weight_decay=WEIGHT_DECAY)
 
+    # Logging.
     writer = SummaryWriter(args.log_dir)
+    global_step = 0
 
-    for epoch in trange(EPOCHS):
-        if LBFGS:
-            train_epoch_lbfgs(dataset, train_loader, model, optim, writer, epoch)
-        else:
-            train_epoch_adam(dataset, train_loader, model, optim, writer, epoch)
-            lr_scheduler.step()
+    for epoch in trange(500, desc="Adam"):
+        train_epoch_adam(adam)
+        val_epoch()
+        global_step += 1
 
-        val_epoch(dataset, val_loader, model, writer, epoch)
+    for epoch in trange(200, desc="LBFGS"):
+        train_epoch_lbfgs(lbfgs)
+        val_epoch()
+        global_step += 1
 
     torch.save(model.state_dict(), args.log_dir / "model_latest.pt")
-
-
-def test():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("dataset", default="../data/new_data_5_filtered.csv")
-    parser.add_argument("model", default="runs/32mlp/model_e2999.pt")
-    args = parser.parse_args()
-
-    dataset = FetDataset(args.dataset, "cpu")
-
-    model = FetDNNModel()
-    model.load_state_dict(torch.load(args.model))
-
-    x = torch.load("x.pt").unsqueeze(0)
-    y = model(x)
-    print(y)
-
-
-if __name__ == "__main__":
-    train()
