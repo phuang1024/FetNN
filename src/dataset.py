@@ -149,8 +149,22 @@ def split_train_val(dataset, ratio, batch_size):
     val_len = len(dataset) - train_len
     train_data, val_data = random_split(dataset, (train_len, val_len))
 
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    """
+    all_indices = list(range(len(dataset)))
+    import random
+    random.shuffle(all_indices)
+    train_data = torch.utils.data.Subset(dataset, all_indices[:train_len])
+    val_data = torch.utils.data.Subset(dataset, all_indices[train_len:])
+    """
+
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=False)
     val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False)
+
+    def print_loader(loader, name):
+        x, y = next(iter(loader))
+        print(f"{name} loader: len={len(loader)}, x_shape={x.shape}, y_shape={y.shape}")
+    print_loader(train_loader, "Train")
+    print_loader(val_loader, "Val")
     return train_loader, val_loader
 
 

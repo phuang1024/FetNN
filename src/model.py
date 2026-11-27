@@ -7,6 +7,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
+from torch.nn.functional import mse_loss
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import trange
 
@@ -30,9 +31,6 @@ class FetDNNModel(nn.Module):
             nn.Linear(self.dim_hidden, self.dim_hidden),
             nn.SiLU(),
             #nn.Dropout(0.1),
-            nn.Linear(self.dim_hidden, self.dim_hidden),
-            nn.SiLU(),
-            #nn.Dropout(0.1),
             nn.Linear(self.dim_hidden, Y_DIM),
         )
 
@@ -42,13 +40,8 @@ class FetDNNModel(nn.Module):
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# TODO tune this.
-EPOCHS = 5000
-BATCH_SIZE = 256
-LR = 2e-3
-
-epoch = 0
-global_step = 0
+LBFGS = True
+EPOCHS = 1000
 
 
 @torch.no_grad()
@@ -59,26 +52,51 @@ def augment_data(x, y, noise=1e-3):
     return x, y
 
 
-def train_epoch(dataset, model, optim, train_loader, writer):
-    global global_step
+def train_epoch_adam(dataset, train_loader, model, optim, writer, epoch):
     model.train()
 
+    total_mse = 0
     for x, y in train_loader:
         #x, y = augment_data(x, y)
         pred = model(x)
 
-        loss = torch.nn.functional.mse_loss(pred, y)
+        loss = mse_loss(pred, y)
+        total_mse += loss.item()
+
         loss.backward()
         optim.step()
         optim.zero_grad()
 
-        writer.add_scalar("train/loss", loss.item(), global_step)
-        writer.add_scalar("train/lr", optim.param_groups[0]["lr"], global_step)
-        global_step += 1
+    total_mse /= len(train_loader)
+    writer.add_scalar("train/mse", total_mse, epoch)
+    writer.add_scalar("train/lr", optim.param_groups[0]["lr"], epoch)
+
+
+def train_epoch_lbfgs(dataset, train_loader, model, optim, writer, epoch):
+    def loss_callback():
+        # Weight decay.
+        optim.zero_grad()
+        pred = model(x)
+        loss = mse_loss(pred, y)
+
+        """
+        l2_reg = sum(p.pow(2).sum() for p in model.parameters())
+        loss += l2_reg * 1e-4
+        """
+
+        loss.backward()
+        return loss
+
+    model.train()
+    x, y = next(iter(train_loader))
+    #x, y = augment_data(x, y)
+    total_mse = optim.step(loss_callback)
+
+    writer.add_scalar("train/mse", total_mse.item(), epoch)
 
 
 @torch.no_grad()
-def val_epoch(dataset, model, val_loader, writer):
+def val_epoch(dataset, val_loader, model, writer, epoch):
     model.eval()
 
     total_mse = 0
@@ -98,8 +116,8 @@ def val_epoch(dataset, model, val_loader, writer):
 
     total_mse /= len(val_loader)
     total_mre /= len(val_loader)
-    writer.add_scalar("val/mse", total_mse, global_step)
-    writer.add_scalar("val/mre", total_mre, global_step)
+    writer.add_scalar("val/mse", total_mse, epoch)
+    writer.add_scalar("val/mre", total_mre, epoch)
 
     # TODO generate samples
 
@@ -115,26 +133,35 @@ def train():
 
     # Make datasets.
     dataset = FetDataset(args.data, DEVICE)
-    train_loader, val_loader = split_train_val(dataset, 0.8, BATCH_SIZE)
+    if LBFGS:
+        train_loader, val_loader = split_train_val(dataset, 0.8, len(dataset))
+    else:
+        train_loader, val_loader = split_train_val(dataset, 0.8, 256)
 
     # Make model.
     model = FetDNNModel().to(DEVICE)
-    optim = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 1000, 0.5)
+    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(model)
+    print("Num params:", num_params)
+
+    if LBFGS:
+        optim = torch.optim.LBFGS(model.parameters())
+    else:
+        optim = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 250, 0.5)
 
     writer = SummaryWriter(args.log_dir)
 
-    print(model)
-    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print("Num params:", num_params)
-
-    global epoch
     for epoch in trange(EPOCHS):
-        train_epoch(dataset, model, optim, train_loader, writer)
-        val_epoch(dataset, model, val_loader, writer)
-        lr_scheduler.step()
+        if LBFGS:
+            train_epoch_lbfgs(dataset, train_loader, model, optim, writer, epoch)
+        else:
+            train_epoch_adam(dataset, train_loader, model, optim, writer, epoch)
+            lr_scheduler.step()
 
-    torch.save(model.state_dict(), args.log_dir / f"model_e{epoch}.pt")
+        val_epoch(dataset, val_loader, model, writer, epoch)
+
+    torch.save(model.state_dict(), args.log_dir / "model_latest.pt")
 
 
 def test():
