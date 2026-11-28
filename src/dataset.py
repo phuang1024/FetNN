@@ -142,32 +142,6 @@ def read_csv(path):
     return raw_data, labels
 
 
-def split_train_val(dataset, ratio, batch_size):
-    """Helper func to split dataset.
-    """
-    train_len = int(len(dataset) * ratio)
-    val_len = len(dataset) - train_len
-    train_data, val_data = random_split(dataset, (train_len, val_len))
-
-    """
-    all_indices = list(range(len(dataset)))
-    import random
-    random.shuffle(all_indices)
-    train_data = torch.utils.data.Subset(dataset, all_indices[:train_len])
-    val_data = torch.utils.data.Subset(dataset, all_indices[train_len:])
-    """
-
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=False)
-    val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False)
-
-    def print_loader(loader, name):
-        x, y = next(iter(loader))
-        print(f"{name} loader: len={len(loader)}, x_shape={x.shape}, y_shape={y.shape}")
-    print_loader(train_loader, "Train")
-    print_loader(val_loader, "Val")
-    return train_loader, val_loader
-
-
 def plot_feature_dists(dataset: FetDataset):
     """Plot hist of each feature.
     After logging and normalizing.
@@ -178,6 +152,21 @@ def plot_feature_dists(dataset: FetDataset):
         plt.subplot(5, 3, i + 1)
         plt.hist(dataset.data[:, i], bins=50)
         plt.title(f"{dataset.labels[i]}: log={LOG_FEATURE[i]}, mean={dataset.means[i]:.3f}, std={dataset.stds[i]:.3f}")
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_feature_sequential(dataset: FetDataset):
+    """Plot value of each feature by index in dataset.
+    To see if dataset isn't uniform or shuffled.
+    """
+    plt.figure(figsize=(20, 20))
+
+    for i in range(dataset.data.shape[1]):
+        plt.subplot(5, 3, i + 1)
+        plt.plot(dataset.data[:, i])
+        plt.title(dataset.labels[i])
 
     plt.tight_layout()
     plt.show()
@@ -195,10 +184,31 @@ def plot_2d(dataset, col1, col2, label1="", label2=""):
     plt.show()
 
 
+def plot_extremity(dataset):
+    """On BV-Rsp 2D space, color each point by how extreme the recipe X is."""
+    indices = torch.tensor([2])
+    xs = dataset.data[:, indices]
+    mins = dataset.mins[indices]
+    maxes = dataset.maxes[indices]
+
+    extremity = torch.minimum(torch.abs(xs - mins), torch.abs(xs - maxes))
+    extremity = torch.mean(extremity, dim=1)
+    #extremity = xs
+
+    plt.scatter(dataset.raw_data[:, -3], dataset.raw_data[:, -4], c=extremity)
+
+    plt.xlabel("BV")
+    plt.ylabel("Rsp")
+    plt.colorbar()
+
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("data", default="../data/new_data_5_filtered.csv")
+    parser.add_argument("--data", default="../data/new_data_5_filtered.csv")
     args = parser.parse_args()
 
     # Print dataset stats.
@@ -208,5 +218,7 @@ if __name__ == "__main__":
     print("  x:", x.shape, x.dtype, x)
     print("  y:", y.shape, y.dtype, y)
 
-    plot_feature_dists(dataset)
+    #plot_feature_dists(dataset)
+    #plot_feature_sequential(dataset)
     #plot_2d(dataset, 1, -4, "tox", "Rsp")
+    plot_extremity(dataset)

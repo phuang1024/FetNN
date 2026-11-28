@@ -7,7 +7,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from torch.nn.functional import mse_loss
+import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import trange
 
@@ -19,7 +19,7 @@ class FetDNNModel(nn.Module):
     (B, X_DIM) -> (B, Y_DIM)
     """
     # TODO tune this.
-    dim_hidden = 32
+    dim_hidden = 24
 
     def __init__(self):
         super().__init__()
@@ -27,10 +27,10 @@ class FetDNNModel(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(X_DIM, self.dim_hidden),
             nn.SiLU(),
-            #nn.Dropout(0.1),
+            nn.Dropout(0.1),
             nn.Linear(self.dim_hidden, self.dim_hidden),
             nn.SiLU(),
-            #nn.Dropout(0.1),
+            nn.Dropout(0.1),
             nn.Linear(self.dim_hidden, Y_DIM),
         )
 
@@ -42,11 +42,11 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ADAM_BS = 256
 ADAM_LR = 2e-3
-WEIGHT_DECAY = 1e-5
+WEIGHT_DECAY = 1e-4
 
 
 @torch.no_grad()
-def augment_data(x, y, noise=1e-3):
+def augment_data(x, y, noise=5e-3):
     # Random noise.
     x = x + torch.randn_like(x) * noise
     y = y + torch.randn_like(y) * noise
@@ -61,10 +61,10 @@ def train_epoch_adam(optim):
 
     total_mse = 0
     for x, y in train_loader:
-        #x, y = augment_data(x, y)
+        x, y = augment_data(x, y)
         pred = model(x)
 
-        loss = mse_loss(pred, y)
+        loss = F.mse_loss(pred, y)
         total_mse += loss.item()
 
         loss.backward()
@@ -83,7 +83,7 @@ def train_epoch_lbfgs(optim):
     def loss_callback():
         optim.zero_grad()
         pred = model(x)
-        loss = mse_loss(pred, y)
+        loss = F.huber_loss(pred, y)
 
         # Weight decay.
         l2_reg = sum(p.pow(2).sum() for p in model.parameters())
@@ -93,7 +93,8 @@ def train_epoch_lbfgs(optim):
         return loss
 
     train_loader = DataLoader(train_data, batch_size=len(train_data))
-    model.train()
+    # No Dropout for LBFGS.
+    model.eval()
 
     x, y = next(iter(train_loader))
     #x, y = augment_data(x, y)
@@ -113,7 +114,7 @@ def val_epoch():
     pred = model(x)
 
     # MSE loss.
-    loss = mse_loss(pred, y)
+    loss = F.mse_loss(pred, y)
     total_mse = loss.item()
 
     # MRE of unnormalized values.
@@ -156,19 +157,21 @@ if __name__ == "__main__":
     print("Num params:", num_params)
 
     # Make optimizers.
-    lbfgs = torch.optim.LBFGS(model.parameters())
-    adam = torch.optim.Adam(model.parameters(), lr=ADAM_LR, weight_decay=WEIGHT_DECAY)
+    lbfgs = torch.optim.LBFGS(model.parameters(), line_search_fn="strong_wolfe")
+    adam = torch.optim.AdamW(model.parameters(), lr=ADAM_LR, weight_decay=WEIGHT_DECAY)
+    #adam_sched = torch.optim.lr_scheduler.StepLR(adam, 200, 0.6)
 
     # Logging.
     writer = SummaryWriter(args.log_dir)
     global_step = 0
 
-    for epoch in trange(500, desc="Adam"):
+    for epoch in trange(300, desc="Adam"):
         train_epoch_adam(adam)
         val_epoch()
+        #adam_sched.step()
         global_step += 1
 
-    for epoch in trange(200, desc="LBFGS"):
+    for epoch in trange(100, desc="LBFGS"):
         train_epoch_lbfgs(lbfgs)
         val_epoch()
         global_step += 1
