@@ -27,10 +27,15 @@ class FetDNNModel(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(X_DIM, self.dim_hidden),
             nn.SiLU(),
-            nn.Dropout(0.1),
+
             nn.Linear(self.dim_hidden, self.dim_hidden),
             nn.SiLU(),
             nn.Dropout(0.1),
+
+            nn.Linear(self.dim_hidden, self.dim_hidden),
+            nn.SiLU(),
+            nn.Dropout(0.1),
+
             nn.Linear(self.dim_hidden, Y_DIM),
         )
 
@@ -40,7 +45,7 @@ class FetDNNModel(nn.Module):
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-ADAM_BS = 256
+ADAM_BS = 32
 ADAM_LR = 2e-3
 WEIGHT_DECAY = 1e-4
 
@@ -139,8 +144,8 @@ if __name__ == "__main__":
     torch.set_num_interop_threads(2)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("data")
     parser.add_argument("log_dir", type=Path)
+    parser.add_argument("--data", default="../data/new_data_4.csv")
     args = parser.parse_args()
 
     # Make datasets.
@@ -171,9 +176,11 @@ if __name__ == "__main__":
         #adam_sched.step()
         global_step += 1
 
-    for epoch in trange(100, desc="LBFGS"):
+    """
+    for epoch in trange(30, desc="LBFGS"):
         train_epoch_lbfgs(lbfgs)
         val_epoch()
         global_step += 1
+    """
 
     torch.save(model.state_dict(), args.log_dir / "model_latest.pt")

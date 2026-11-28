@@ -8,17 +8,18 @@ import numpy as np
 import torch
 
 from dataset import FetDataset, X_DIM
+from inverse_gd import *
 from model import FetDNNModel
 from test_design import plot_2d_trajs
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data", default="../data/new_data_5_filtered.csv")
-parser.add_argument("--model", default="runs/32mlp/model_e2999.pt")
+parser.add_argument("--data", default="../data/new_data_4.csv")
+parser.add_argument("--model", default="runs/adam_3layer/model_latest.pt")
 args = parser.parse_args()
 
 dataset = FetDataset(args.data, "cpu")
 
-BV_TARGET = 15
+BV_TARGET = 18
 VTH_TARGET = 1.5
 bv_logit, vth_logit = dataset.normalize([[BV_TARGET, VTH_TARGET]], [-3, -1]).squeeze(0)
 
@@ -101,6 +102,10 @@ class FetProblem(cyipopt.Problem):
             cl=[bv_logit, vth_logit - 0.2],
             cu=[1e9, vth_logit + 0.2],
         )
+
+        nlp.add_option("mu_strategy", "monotone")
+        nlp.add_option("mu_init", 3e-2)
+
         nlp.add_option("max_iter", 50)
         return nlp
 
@@ -131,30 +136,28 @@ def plot_results():
     plot_2d_trajs(dataset, [(traj_x, traj_y, losses)], "Ipopt", 1)
 
 
-def test_optim(dataset, model, bv_floor, vth_target):
+def test_gd():
     """Test Adam vs SGD
     """
     designer = InverseGD(dataset, model)
-    designer.add_criterion(wall_x(dataset), 2e-2)
+    designer.add_criterion(wall_x(dataset), 1e-3)
     designer.add_criterion(y_minimize(0), 1)
-    designer.add_criterion(y_floor(1, bv_floor), 1e-2)
-    designer.add_criterion(y_target(3, vth_target), 1)
+    designer.add_criterion(y_floor(1, bv_logit), 1e-3)
+    designer.add_criterion(y_target(3, vth_logit), 1)
 
     results = []
     results.append(designer.run_inverse_design(
-        steps=2000,
-    ))
-    results.append(designer.run_inverse_design(
-        steps=2000,
-        lr=5e-2,
-        optim_alg="sgd",
+        steps=30,
+        lr=1e-1,
     ))
 
-    plot_2d_trajs(dataset, results, ("Adam", "SGD"))
+    plot_2d_trajs(dataset, results, ["GD method"], 1)
     return results[0]
 
 
 def main():
+    # test_gd()
+
     # Test this.
     ipm_values = ComputeIpmValues()
     result = ipm_values.compute(np.zeros([X_DIM]))

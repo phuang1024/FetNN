@@ -9,11 +9,10 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader, random_split
 
-X_DIM = 11
+X_DIM = 10
 Y_DIM = 4
 """Number of X, Y features in dataset."""
 
-"""
 # For new_data_4.csv
 LOG_FEATURE = (
     False, False,
@@ -33,6 +32,7 @@ LOG_FEATURE = (
 
     False, False, True, False,
 )
+"""
 """Whether to log each feature."""
 
 
@@ -208,7 +208,7 @@ def plot_extremity(dataset):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", default="../data/new_data_5_filtered.csv")
+    parser.add_argument("--data", default="../data/new_data_4.csv")
     args = parser.parse_args()
 
     # Print dataset stats.

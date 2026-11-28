@@ -12,7 +12,7 @@ from dataset import FetDataset, read_csv, X_DIM
 from inverse_gd import *
 from model import FetDNNModel
 
-BV_TARGET = 15
+BV_TARGET = 18
 VTH_TARGET = 1.5
 
 
@@ -182,8 +182,8 @@ def test_optim(dataset, model, bv_floor, vth_target):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", default="../data/new_data_5_filtered.csv")
-    parser.add_argument("--model", default="runs/32mlp/model_e2999.pt")
+    parser.add_argument("--data", default="../data/new_data_4.csv")
+    parser.add_argument("--model", default="runs/adam_3layer/model_latest.pt")
     args = parser.parse_args()
 
     dataset = FetDataset(args.data, "cpu")
